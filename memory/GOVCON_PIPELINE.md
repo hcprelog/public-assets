@@ -58,3 +58,14 @@ Score ≥7: Submit | Score 5–6: Submit if bandwidth | Score <5: Pass
 3. Score each ≥7/10 → create deal in HubSpot immediately
 4. For each pursued opp: find execution vendor before contacting
 5. Log triage as [DATE]-[SOLNUM]-triage.md in /govcon/opportunities/
+
+## SCAN LOG SUMMARY
+| Date | Status | Bid Candidates | Notes |
+|---|---|---|---|
+| 2026-06-01 | BLOCKED | 0 | SAM.gov API key required. See /automation/logs/SAM_SCAN_LOG.md |
+
+## UNBLOCK REQUIRED — PRESIDENT HUNTER
+To enable automated weekly scans without GovTribe:
+- Register free SAM.gov API key at: api.sam.gov/prod/users/register
+- OR: Perform manual SAM.gov search and paste results into Claude chat for scoring
+- Until unblocked: all scans will log BLOCKED with 0 candidates
