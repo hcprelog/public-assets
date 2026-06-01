@@ -1,35 +1,53 @@
 # PRICING_SHEET.md — H&C PRECISE LOGISTICS LLC
-Source: CLAUDE.md v2.2 | Verified: hcprelog.com live — June 2026
-Next sync: September 2026
+Source: Wix API (live) | Verified: 2026-06-01 | Next sync: 2026-09-01
 
 ---
 
-## LIVE PRODUCTS
+## SUBSCRIPTIONS
 
-| Product | Price | Billing | Notes |
+| Plan | Monthly | Annual | Wix Plan ID |
 |---|---|---|---|
-| GovCon Starter Academy | $0 | Free | Lead magnet / top of funnel |
-| GovCon Newsletter | $10/month | Monthly | Entry-level intel |
-| GovCon Academy+ | $149/month | Monthly | Core subscription |
-| Contract Acquisition Support | $1,500 | 6-month engagement | Project-based |
-| Proposal + Strategy Support | $1,800 | Annual | Year-long support |
-| GovCon Strategy Call | $347 | Per session | 1.5 hours with President Hunter |
-| Proposal & Compliance Review | $297 | Per session | 1.5 hours |
+| GovCon Starter Academy (Free) | $0 | — | 6678cccf-8073-4703-a435-08dca0cedaf4 |
+| STARTER | $97/mo | $930/yr (save 20%) | c6a3b621 (mo) · d238ab8c (yr) |
+| GROWTH — MOST POPULAR | $297/mo | $2,851/yr (save 20%) | 67e36987 (mo) · 52698519 (yr) |
+| PRIME READY | $797/mo | $7,651/yr (save 20%) | e13fe229 (mo) · 1a351149 (yr) |
+
+## ONE-TIME SERVICES
+
+| Product | Price | Wix Plan ID |
+|---|---|---|
+| GovCon Strategy Session (90 min) | $347 | c0dff8d7-6d91-488f-bb36-31735771e7e8 |
+| eBook: GovCon Starter Guide | $47 | 2840e243-7f48-461f-b8a9-c4cdee58b696 |
+| SAM.gov Registration Support | $197 | 0b339c0a-5274-40a5-a003-1144329ad3a9 |
+| Capability Statement Design | $297 | 290be813-76e7-464b-918e-219e2d78de1c |
 
 ## INTERNAL RATES (NEVER DISCLOSE EXTERNALLY)
+
 | Rate | Value |
 |---|---|
 | Markup minimum | 10% |
 | Markup internal target | 12% |
 | Upwork hourly rate | $55/hr |
 
-## ⚠️ LEGACY PLANS (built 2026-06-01 — status pending review)
-These Wix plans were created in the 2026-06-01 session and may need to be archived:
-- STARTER — $97/mo (Wix ID: c6a3b621-1bb9-4aa9-ab2a-14180930eaca)
-- GROWTH — MOST POPULAR — $297/mo (Wix ID: 67e36987-7d60-4439-8e17-5af387495ebc)
-- PRIME READY — $797/mo (Wix ID: e13fe229-4f0a-466f-b429-89ace19e6b4e)
-- STARTER Annual — $930/yr (Wix ID: d238ab8c-9e88-4d4e-a878-524030950072)
-- GROWTH Annual — $2,851/yr (Wix ID: 52698519-b7a0-4eb1-acc7-dfadbc4e8448)
-- PRIME READY Annual — $7,651/yr (Wix ID: 1a351149-b0f1-4257-a839-bb2f41067f05)
+## PLAN PERKS SUMMARY
 
-[AWAITING PRESIDENT HUNTER APPROVAL — archive or keep legacy plans?]
+**STARTER** — $97/mo
+- Weekly GovCon contract opportunities matched to your NAICS
+- Bid/no-bid decision framework + checklists
+- SAM.gov + certifications guidance library
+- H&C template vault (compliance matrix, capability statement)
+
+**GROWTH** — $297/mo *(includes everything in STARTER)*
+- Monthly Federal Contract Intelligence Report (normally $47/mo — included)
+- Monthly 1-on-1 strategy session with H&C team (60 min)
+- Proposal review + compliance feedback (up to 2/mo)
+- Subcontractor sourcing + teaming support guidance
+- Priority email response within 1 business day
+
+**PRIME READY** — $797/mo *(includes everything in GROWTH)*
+- Monthly Federal Contract Intelligence Report (normally $47/mo — included)
+- Full contract pursuit management (bid to award)
+- Subcontractor sourcing, vetting + coordination
+- Post-award execution support + invoicing guidance
+- SDVOSB/HUBZone set-aside targeting strategy
+- Dedicated H&C point of contact

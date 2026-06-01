@@ -47,7 +47,7 @@ Open flags: 1 (pricing discrepancy)
 ## OPEN FLAGS
 | Flag | Severity | Description |
 |---|---|---|
-| PRICING_DISCREPANCY | HIGH | Wix plans built 2026-06-01 (STARTER/GROWTH/PRIME READY) do not match CLAUDE.md v2.2 live pricing. See BUSINESS_STATE.md and PRICING_SHEET.md for full details. [AWAITING PRESIDENT HUNTER APPROVAL] |
+| PRICING_DISCREPANCY | CLOSED | Resolved 2026-06-01. President Hunter confirmed Wix live pricing is correct. CLAUDE.md and PRICING_SHEET.md updated. |
 
 ## OUTPUTS MIGRATION NOTE
 Files in /outputs/ predate this repo structure. Recommend migrating:

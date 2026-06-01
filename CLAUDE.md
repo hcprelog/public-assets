@@ -25,13 +25,17 @@ MARKUP_MIN:    10%  # NEVER disclose externally
 MARKUP_INT:    12%  # NEVER disclose externally
 
 ## LIVE PRICING (verified hcprelog.com/pricing-plans/list — June 2026)
-PLAN_FREE:     GovCon Starter Academy         $0
-PLAN_NEWS:     GovCon Newsletter               $10/month
-PLAN_ACAD:     GovCon Academy+                $149/month
-PLAN_ACQ:      Contract Acquisition Support    $1,500 / 6-month
-PLAN_PROP:     Proposal + Strategy Support     $1,800 / year
-SESSION_STRAT: GovCon Strategy Call            $347 / 1.5 hr
-SESSION_COMP:  Proposal & Compliance Review    $297 / 1.5 hr
+# Subscriptions
+PLAN_FREE:     GovCon Starter Academy (Free)   $0/unlimited
+PLAN_START:    STARTER                          $97/month  | $930/year (save 20%)
+PLAN_GROWTH:   GROWTH — MOST POPULAR           $297/month | $2,851/year (save 20%)
+PLAN_PRIME:    PRIME READY                      $797/month | $7,651/year (save 20%)
+# One-time services
+SESSION_STRAT: GovCon Strategy Session (90 min) $347
+SESSION_EBOOK: eBook: GovCon Starter Guide      $47
+SESSION_SAM:   SAM.gov Registration Support     $197
+SESSION_CAP:   Capability Statement Design      $297
+# Internal
 UPWORK_RATE:   $55/hr  # Not published on website
 
 ---

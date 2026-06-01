@@ -33,23 +33,10 @@ Active subagent roles completed this session:
 
 ---
 
-## ⚠️ PRICING DISCREPANCY — [AWAITING PRESIDENT HUNTER REVIEW]
-
-Wix plans built in this session DO NOT match CLAUDE.md v2.2 live pricing.
-
-| What's live on Wix (built this session) | What CLAUDE.md says is live |
-|---|---|
-| GovCon Starter Academy — $0 | GovCon Starter Academy — $0 ✅ |
-| STARTER — $97/mo | GovCon Newsletter — $10/mo ⚠️ |
-| GROWTH — $297/mo | GovCon Academy+ — $149/mo ⚠️ |
-| PRIME READY — $797/mo | Contract Acquisition Support — $1,500/6-mo ⚠️ |
-| STARTER Annual — $930/yr | Proposal + Strategy Support — $1,800/yr ⚠️ |
-| GROWTH Annual — $2,851/yr | (no annual equivalents listed) ⚠️ |
-| PRIME READY Annual — $7,651/yr | (no annual equivalents listed) ⚠️ |
-| GovCon Strategy Session — $347 | GovCon Strategy Call — $347 ✅ |
-| (not present) | Proposal & Compliance Review — $297 ⚠️ |
-
-**Action required:** President Hunter to confirm which pricing is current and whether old plans should be archived in Wix.
+## PRICING — RESOLVED ✅
+Confirmed by President Hunter 2026-06-01: Wix live pricing is correct.
+CLAUDE.md v2.2 pricing section updated to match live site.
+See /memory/PRICING_SHEET.md for full verified pricing.
 
 ---
 
