@@ -15,6 +15,7 @@ Each scan entry: Date | Status | Opps Found | Bid Candidates | Blocker | Notes
 | Date | Status | Opps Scanned | Bid Candidates | Blocker | Notes |
 |---|---|---|---|---|---|
 | 2026-06-01 | BLOCKED | 0 | 0 | SAM.gov API key required | All platforms 403/ECONNREFUSED. See /govcon/opportunities/2026-06-01-weekly-scan.md |
+| 2026-06-02 | COMPLETE | 3 | 3 | None | API key active. NAICS 492110 returned 3 SDVOSB VA courier opps. See /govcon/opportunities/2026-06-02-weekly-scan.md |
 
 ---
 

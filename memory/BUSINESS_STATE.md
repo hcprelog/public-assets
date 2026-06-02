@@ -73,12 +73,29 @@ See /memory/PRICING_SHEET.md for full verified pricing.
 
 ---
 
+## GOVCON SCAN — 2026-06-02 [DECISION NEEDED — PRESIDENT HUNTER]
+
+3 live SDVOSB VA courier opportunities. All scored 8-9/10.
+
+| # | Solicitation | Deadline | Action |
+|---|---|---|---|
+| 1 | 36C24626Q0536 — VA VISN6 Hampton VA | **Jun 5 🔴** | Capability statement |
+| 2 | 36C24926Q0230 — VA JHQVAMC McDonald TN | **Jun 9 🟠** | Full quote + TN sub |
+| 3 | 36C24126Q0174 — VA VISN1 Bedford MA | Jun 15 🟡 | Full proposal + MA sub |
+
+HubSpot deals: 327757761262 · 327683565272 · 327811641074
+Triage file: /govcon/opportunities/2026-06-02-weekly-scan.md
+
+---
+
 ## NEXT SESSION TOP PRIORITIES
-1. Resolve pricing discrepancy — confirm which Wix plans are correct
-2. Wix Editor 5 manual fixes → publish (Gate 1)
-3. GSA MAS application — start today
-4. HubSpot pipeline + custom properties (dashboard)
-5. Post LinkedIn content batch
+1. **[URGENT]** BID/PASS on 36C24626Q0536 — deadline June 5
+2. **[HIGH]** BID/PASS on 36C24926Q0230 — deadline June 9
+3. Wix Editor 5 manual fixes → publish (Gate 1)
+4. GSA MAS application
+5. Add GitHub Secret SAM_API_KEY (repo settings) to enable automated Monday scans
+6. HubSpot pipeline + custom properties (dashboard)
+7. Post LinkedIn content batch
 
 ---
 

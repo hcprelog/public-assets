@@ -17,6 +17,18 @@ Active deals: 11 | Won: 1 | Closed: 0
 
 ---
 
+## LIVE BID CANDIDATES — FROM 2026-06-02 SCAN [DECISION NEEDED — PRESIDENT HUNTER]
+
+| Deal | Value | HubSpot ID | Deadline | Score | Status |
+|---|---|---|---|---|---|
+| VA VISN1 Lab Courier — Bedford MA (36C24126Q0174) | $150,000 | 327757761262 | **Jun 15** | 9/10 | Awaiting approval to bid |
+| VA VISN6 Lab Courier — Hampton VA Pre-Sol (36C24626Q0536) | $100,000 | 327683565272 | **Jun 5 🔴** | 9/10 | Awaiting approval — capability stmt only |
+| VA JHQVAMC Lab Courier — McDonald TN (36C24926Q0230) | $100,000 | 327811641074 | **Jun 9 🟠** | 8/10 | Awaiting approval to bid |
+
+See full triage: /govcon/opportunities/2026-06-02-weekly-scan.md
+
+---
+
 ## ACTIVE PURSUIT DEALS (stage: appointmentscheduled)
 
 | Deal | Value | HubSpot ID | Next Step |

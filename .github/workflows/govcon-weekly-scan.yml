@@ -34,7 +34,7 @@ jobs:
           SCAN_FILE="govcon/opportunities/${FILE_DATE}-weekly-scan.md"
           LOG_FILE="automation/logs/SAM_SCAN_LOG.md"
 
-          NAICS_CODES=("484110" "493110" "541614" "488510" "492110")
+          NAICS_CODES=("484110" "484121" "484122" "484220" "484230" "488490" "488510" "488999" "492110" "492210" "493110" "541611" "541614" "561210" "561720")
           PTYPES="o,p,k,r"
 
           echo "# Weekly GovCon Opportunity Scan — ${FILE_DATE}" > /tmp/scan_results.md
