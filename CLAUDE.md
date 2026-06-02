@@ -155,7 +155,9 @@ SAM_API_KEY_SECRET_NAME: SAM_API_KEY
 ## WORK RULES
 - Compliance-first. Audit-ready. No invented facts.
 - govcon-opportunity-triage MUST run before any vendor contact
+- Sub/vendor search is MANDATORY before any bid decision — check /govcon/vendors/naics-[code]-subs.md first
 - Never contact vendors without packaged one-page Opportunity Summary
+- Sub outreach script in /ops/sops/HC-SOP-001-bid-and-vendor-sourcing.md § Step 6
 - Goods contracts: $5K–$25K · Net 30 · dropship preferred
 - Yola Nights credit ($10K cap) = absolute last resort only
 - Education files = DRAFT ONLY until explicitly approved to submit
