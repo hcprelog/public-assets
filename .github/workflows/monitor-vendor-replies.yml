@@ -24,7 +24,7 @@ jobs:
         run: |
           git config user.name "H&C Ops Bot"
           git config user.email "hcprelog@gmail.com"
-          git add govcon/vendors/ automation/logs/
+          git add -A
           git diff --staged --quiet \
             && echo "No new replies" \
             || git commit -m "[$(date +%Y-%m-%d)] monitor: vendor reply status update"
