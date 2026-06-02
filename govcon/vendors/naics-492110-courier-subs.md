@@ -39,11 +39,12 @@ H&C's value proposition: "You're registered but not winning because you don't ha
 | Location | Boston, MA (serves all of Massachusetts) |
 | Phone | 617-807-0411 |
 | Website | bocsit.com |
+| Email | No public email found — use phone or bocsit.com contact form |
 | Services | Same-day medical specimen, STAT delivery, HIPAA compliant, 24/7 |
 | SAM Registered | Unknown — no government work found ✅ Tier 1 |
 | Size | Small (1-20 est.) |
-| Status | **COLD — not yet contacted** |
-| Notes | Medical specimen specialist — directly relevant to VA lab courier work |
+| Status | **COLD — phone/web form outreach (no email found)** |
+| Notes | Medical specimen specialist — directly relevant to VA lab courier work. Call 617-807-0411 or submit via bocsit.com contact form. Phone script below. |
 
 ### Allstate Courier Systems *(Tier 2 — consulting prospect)*
 | Field | Detail |
@@ -64,13 +65,15 @@ H&C's value proposition: "You're registered but not winning because you don't ha
 ### East Coast Courier Company (ECCC) ⭐ TOP PICK
 | Field | Detail |
 |---|---|
-| Location | P.O. Box 2053, Norfolk, VA 23501 |
+| Location | 723 Woodis Ave, Norfolk, VA 23510 |
+| Phone | (757) 640-7767 |
+| Email | eccconline@gmail.com |
 | Website | eastcoastcourieronline.com |
 | Services | Small parcel delivery, Southeast VA corridor, Bon Secours hospitals, Red Cross |
 | SAM Registered | Not found ✅ Tier 1 |
 | Size | Independent fleet, Hampton Roads area |
-| Founded | 1998 — family-owned |
-| Status | **COLD — not yet contacted** |
+| Founded | 1999 — family-owned |
+| Status | **EMAIL DRAFTED — Gmail draft ID: r-539757807856204460** |
 | Notes | Already serves Bon Secours hospitals — VA medical work is a natural fit. Family-owned = owner-accessible. No government contracting overhead. |
 
 ### CourierVA (Ports Atlantic Logistics LLC) ⭐ VETERAN-OWNED
@@ -125,11 +128,38 @@ H&C's value proposition: "You're registered but not winning because you don't ha
 
 ---
 
+## BOCSIT PHONE / WEB FORM SCRIPT (Bedford MA / VISN1 bid)
+
+**Phone opening (call 617-807-0411):**
+> "Hi, my name is Dennis Hunter, President of H&C Precise Logistics — we're an SDVOSB and HUBZone certified federal contractor out of Durham, NC. I'm reaching out because we just identified a VA medical center contract for lab and specimen courier services in the Bedford, Massachusetts area. It's a veteran-owned set-aside — we win the prime contract, you run the routes locally, we pay you Net 30. You're already doing this exact type of work. I'd love 15 minutes to explain how the partnership works — is there someone I could speak with about that?"
+
+**Web form message (bocsit.com contact form):**
+> Subject: VA Hospital Lab Courier Contract — Local Partner Opportunity in Bedford, MA
+>
+> Hi Bocsit team,
+>
+> My name is Dennis Hunter, President of H&C Precise Logistics (hcprelog.com). We're an SDVOSB and HUBZone certified federal contractor based in Durham, NC.
+>
+> We've identified an active VA medical center contract for lab and specimen courier services in the Bedford, Massachusetts area. As a veteran-owned set-aside contract, H&C qualifies to prime it — and we're looking for a local medical courier partner to run the routes.
+>
+> The arrangement is straightforward: H&C holds the prime contract and handles all compliance and billing. Bocsit runs the routes as you normally would. We pay you Net 30 once the government pays us.
+>
+> Your 24/7 HIPAA-compliant specimen courier capability is exactly what this contract requires. I'd love a 15-minute call to walk you through it.
+>
+> Best,
+> Dennis Hunter | President, H&C Precise Logistics | 919-275-0598 | dennis@hcprelog.com
+
+---
+
 ## OUTREACH LOG
 
 | Date | Company | Contact | Method | Response | Next Step |
 |---|---|---|---|---|---|
-| — | — | — | — | — | Awaiting President Hunter approval to contact |
+| 2026-06-02 | East Coast Courier (ECCC) | eccconline@gmail.com | Email draft saved | Pending send | Dennis to review + send Gmail draft r-539757807856204460 |
+| 2026-06-02 | CourierVA (Bruce) | info@courierva.com | Email draft saved | Pending send | Dennis to review + send Gmail draft r-969869535334410324 |
+| 2026-06-02 | Tri City Logistics | dispatch@tricitylogistics.com | Email draft saved | Pending send | Dennis to review + send Gmail draft r541953949455191388 |
+| 2026-06-02 | Allstate Courier Systems | info@allstatecouriers.com | Email draft saved | Pending send | Dennis to review + send Gmail draft r-1785622306246058473 |
+| 2026-06-02 | Bocsit | 617-807-0411 / bocsit.com form | Phone/web form | Pending | Use phone script or web form message above |
 
 ---
 
