@@ -1,0 +1,33 @@
+name: Monitor Vendor Replies
+
+on:
+  schedule:
+    - cron: '0 13 * * 1-5'   # 9 AM ET (Mon-Fri)
+    - cron: '0 21 * * 1-5'   # 5 PM ET (Mon-Fri)
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check Gmail inbox for vendor replies
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: python3 automation/scripts/monitor_replies.py
+
+      - name: Commit updated vendor tracker
+        run: |
+          git config user.name "H&C Ops Bot"
+          git config user.email "hcprelog@gmail.com"
+          git add govcon/vendors/ automation/logs/
+          git diff --staged --quiet \
+            && echo "No new replies" \
+            || git commit -m "[$(date +%Y-%m-%d)] monitor: vendor reply status update"
+
+      - name: Push changes
+        run: git push origin HEAD
