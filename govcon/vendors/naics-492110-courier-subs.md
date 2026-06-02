@@ -55,7 +55,7 @@ H&C's value proposition: "You're registered but not winning because you don't ha
 | Services | Medical courier, route service, STAT, 24/7, New England + national |
 | SAM Registered | YES — state AND federal certified contractor ⚠️ Tier 2 |
 | Certifications | WOSB (Women-Owned Small Business) |
-| Status | **COLD — consulting pitch priority** |
+| Status | **EMAIL SENT 2026-06-02** |
 | Notes | Already government-certified but NOT SDVOSB — pitch PRIME READY plan for SDVOSB teaming access. Could also sub on immediate bids. |
 
 ---
@@ -73,7 +73,7 @@ H&C's value proposition: "You're registered but not winning because you don't ha
 | SAM Registered | Not found ✅ Tier 1 |
 | Size | Independent fleet, Hampton Roads area |
 | Founded | 1999 — family-owned |
-| Status | **EMAIL DRAFTED — Gmail draft ID: r-539757807856204460** |
+| Status | **EMAIL SENT 2026-06-02** |
 | Notes | Already serves Bon Secours hospitals — VA medical work is a natural fit. Family-owned = owner-accessible. No government contracting overhead. |
 
 ### CourierVA (Ports Atlantic Logistics LLC) ⭐ VETERAN-OWNED
@@ -86,7 +86,7 @@ H&C's value proposition: "You're registered but not winning because you don't ha
 | SAM Registered | Unknown — no federal contracts found ✅ Likely Tier 1 |
 | Size | Small — owner-operated |
 | Owner | Jon Broudy (legal); Bruce (ops contact) |
-| Status | **COLD — not yet contacted** |
+| Status | **EMAIL SENT 2026-06-02** |
 | Notes | **VETERAN-OWNED** — perfect alignment with H&C. Pitch: "veteran-to-veteran partnership, H&C has SDVOSB cert you don't, we team and split the revenue." May want to help them get SDVOSB certified long-term. |
 
 ---
@@ -103,7 +103,7 @@ H&C's value proposition: "You're registered but not winning because you don't ha
 | Contacts | Chad Domby + Josh Olinger |
 | Services | Freight carrier, Kingsport/Tri-Cities area |
 | SAM Registered | Unknown — check before outreach |
-| Status | **COLD — not yet contacted** |
+| Status | **EMAIL SENT 2026-06-02** |
 | Notes | Kingsport is 20 min from Mountain Home VA. Direct contact available — fastest path to outreach. |
 
 ### Tri Cities Solutions LLC
@@ -155,11 +155,11 @@ H&C's value proposition: "You're registered but not winning because you don't ha
 
 | Date | Company | Contact | Method | Response | Next Step |
 |---|---|---|---|---|---|
-| 2026-06-02 | East Coast Courier (ECCC) | eccconline@gmail.com | Email draft saved | Pending send | Dennis to review + send Gmail draft r-539757807856204460 |
-| 2026-06-02 | CourierVA (Bruce) | info@courierva.com | Email draft saved | Pending send | Dennis to review + send Gmail draft r-969869535334410324 |
-| 2026-06-02 | Tri City Logistics | dispatch@tricitylogistics.com | Email draft saved | Pending send | Dennis to review + send Gmail draft r541953949455191388 |
-| 2026-06-02 | Allstate Courier Systems | info@allstatecouriers.com | Email draft saved | Pending send | Dennis to review + send Gmail draft r-1785622306246058473 |
-| 2026-06-02 | Bocsit | 617-807-0411 / bocsit.com form | Phone/web form | Pending | Use phone script or web form message above |
+| 2026-06-02 | East Coast Courier (ECCC) | eccconline@gmail.com | Email sent (GitHub Actions SMTP) | Awaiting reply | Monitor auto-checks daily |
+| 2026-06-02 | CourierVA (Bruce) | info@courierva.com | Email sent (GitHub Actions SMTP) | Awaiting reply | Monitor auto-checks daily |
+| 2026-06-02 | Tri City Logistics | dispatch@tricitylogistics.com | Email sent (GitHub Actions SMTP) | Awaiting reply | Monitor auto-checks daily |
+| 2026-06-02 | Allstate Courier Systems | info@allstatecouriers.com | Email sent (GitHub Actions SMTP) | Awaiting reply | Monitor auto-checks daily |
+| 2026-06-02 | Bocsit | 617-807-0411 / bocsit.com form | Phone/web form | PENDING | Dennis to call 617-807-0411 or submit bocsit.com form |
 
 ---
 

@@ -1,5 +1,5 @@
 # VENDOR_OUTREACH_LOG.md — H&C PRECISE LOGISTICS LLC
-Last updated: 2026-06-02 | Managed by: vendor-outreach-monitor.yml (GitHub Actions)
+Last updated: 2026-06-02 | Managed by: monitor-vendor-replies.yml (GitHub Actions)
 
 ---
 
@@ -13,23 +13,15 @@ Last updated: 2026-06-02 | Managed by: vendor-outreach-monitor.yml (GitHub Actio
 
 ---
 
-## ACTIVE OUTREACH LOG
+## SENT LOG
 
 | Date | Company | Email | Action | Result | Thread ID |
 |---|---|---|---|---|---|
-| 2026-06-02 | East Coast Courier (ECCC) | eccconline@gmail.com | Gmail draft created | PENDING SEND (automation will send on next run) | — |
-| 2026-06-02 | CourierVA (Bruce) | info@courierva.com | Gmail draft created | PENDING SEND (automation will send on next run) | — |
-| 2026-06-02 | Tri City Logistics | dispatch@tricitylogistics.com | Gmail draft created | PENDING SEND (automation will send on next run) | — |
-| 2026-06-02 | Allstate Courier Systems | info@allstatecouriers.com | Gmail draft created | PENDING SEND (automation will send on next run) | — |
+| 2026-06-02 | East Coast Courier (ECCC) | eccconline@gmail.com | Email sent via GitHub Actions (SMTP) | Awaiting reply | — |
+| 2026-06-02 | CourierVA (Bruce) | info@courierva.com | Email sent via GitHub Actions (SMTP) | Awaiting reply | — |
+| 2026-06-02 | Tri City Logistics | dispatch@tricitylogistics.com | Email sent via GitHub Actions (SMTP) | Awaiting reply | — |
+| 2026-06-02 | Allstate Courier Systems | info@allstatecouriers.com | Email sent via GitHub Actions (SMTP) | Awaiting reply | — |
 | 2026-06-02 | Bocsit | 617-807-0411 / bocsit.com form | Phone/web form only | PENDING — Dennis to call or submit web form | — |
-
----
-
-## SENT LOG (populated by automation)
-
-| Date | Company | Email | Action | Result | Thread ID |
-|---|---|---|---|---|---|
-| — | — | — | — | — | — |
 
 ---
 
@@ -42,8 +34,7 @@ Last updated: 2026-06-02 | Managed by: vendor-outreach-monitor.yml (GitHub Actio
 ---
 
 ## NOTES
-- Automation sends outreach Monday–Friday at 9 AM ET
-- Replies monitored Monday–Friday at 5 PM ET
-- All changes committed to repo automatically
+- Automation monitors replies Monday–Friday at 9 AM ET and 5 PM ET
+- All changes committed to repo automatically by H&C Ops Bot
 - Full SOP: /ops/sops/HC-SOP-001-bid-and-vendor-sourcing.md
 - Gmail setup guide: /automation/scripts/GMAIL_SETUP.md
