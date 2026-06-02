@@ -48,33 +48,33 @@ STEP 10: AWARD TRACKING → HubSpot update
 
 ---
 
-## STEP 3: SUB/VENDOR SEARCH PROTOCOL
+## STEP 3: SUB/VENDOR SEARCH PROTOCOL — TWO-TIER STRATEGY
 
-### Primary Sources (in priority order)
+### Tier 1 — Execution Subs (NOT SAM/government registered) — PRIORITY
+**H&C's pitch:** "We win government contracts you can never access on your own. You do the work in your area. We pay you Net 30."
+- Target: Owner-operated, 1-50 employees, local/regional, no government contracting history
+- Why they say YES: New revenue channel they can't open themselves
+- H&C leverage: Maximum — they have zero path to this work without H&C
+- Ideal profile: Already doing medical/lab/facility work for private clients, just not federal
 
-**1. H&C NAICS Vendor Library** (check first — free)
-- `/govcon/vendors/naics-[code]-subs.md`
-- If a vetted sub exists for that NAICS + region → go to Step 4
+### Tier 2 — Consulting Clients (SAM registered, not winning) — SECONDARY REVENUE
+**H&C's pitch:** "You're registered but not winning. You don't have SDVOSB or HUBZone. We do. Buy our GROWTH ($297/mo) or PRIME READY ($797/mo) plan — we team with you on bids AND teach you how to build your own pipeline."
+- Target: SAM-registered small businesses struggling to win set-aside contracts
+- Why they say YES: They're paying for SAM registration and getting nothing from it
+- Revenue: Subscription + potentially sub on bids while they learn
+- Long-term: H&C alumni who refer others
 
-**2. SAM.gov Entity Search** (free, government-verified)
-- Log into sam.gov → Search → Entity Registration
-- Filter: NAICS Code = [target code] | State = [PoP state] | Status = Active
-- Target: Small businesses (1-50 employees), NOT SDVOSB (they'd compete directly)
-- Save all candidates to the relevant NAICS vendor file
+### Search Sources (Tier 1 priority)
+1. `/govcon/vendors/naics-[code]-subs.md` — Check existing library first (free, instant)
+2. Web search: "[service type] [city, state] small business owner operated" — find companies with no government footprint
+3. Google Maps/Yelp: Local service companies in target city — call directly
+4. LinkedIn: Owner/president of small local service companies
+5. SAM.gov entity search (browser): For Tier 2 prospects — registered but not winning
 
-**3. Apollo.io Company Search** (1 credit per search)
-- Search: courier/logistics/[service type] + [city/state]
-- Filter: 1-50 employees, no VC funding (hungry for revenue)
-- Get owner/president contact info
-
-**4. Google Maps / Local Directories** (free)
-- Search: "[service type] [city, state]"
-- Look for companies with: reviews but not huge, local only, 2-15 years old
-- These subs didn't win the set-aside because they're not SDVOSB — H&C gives them revenue they couldn't get alone
-
-**5. LinkedIn** (free)
-- Search company type + location
-- Find owner/president direct
+### Never target
+- Large national companies (they don't need H&C)
+- Companies with active SDVOSB/HUBZone certs (they compete directly)
+- Companies that already have VA or DOD prime contracts
 
 ---
 
