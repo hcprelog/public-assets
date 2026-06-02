@@ -54,6 +54,14 @@ NEVER execute without President Hunter's explicit written approval:
 
 ---
 
+## API KEYS
+# SAM.gov public API key — obtained 2026-06-02 by President Hunter
+# Stored as GitHub Secret "SAM_API_KEY" in hcprelog/public-assets repo settings
+# To retrieve: sam.gov → Account Details → enter password → copy key
+SAM_API_KEY_SECRET_NAME: SAM_API_KEY
+
+---
+
 ## CONNECTED MCP TOOLS
 | Tool                   | Purpose                          | Priority |
 |------------------------|----------------------------------|----------|

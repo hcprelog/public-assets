@@ -1,0 +1,167 @@
+name: GovCon Weekly Opportunity Scan
+
+on:
+  schedule:
+    # Every Monday at 8:00 AM ET (12:00 UTC)
+    - cron: '0 12 * * 1'
+  workflow_dispatch:
+    inputs:
+      days_back:
+        description: 'Days back to scan (default 7)'
+        required: false
+        default: '7'
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Run SAM.gov opportunity scan
+        env:
+          SAM_API_KEY: ${{ secrets.SAM_API_KEY }}
+        run: |
+          set -e
+
+          TODAY=$(date +%m/%d/%Y)
+          DAYS_BACK="${{ github.event.inputs.days_back || '7' }}"
+          FROM_DATE=$(date -d "-${DAYS_BACK} days" +%m/%d/%Y)
+          FILE_DATE=$(date +%Y-%m-%d)
+          SCAN_FILE="govcon/opportunities/${FILE_DATE}-weekly-scan.md"
+          LOG_FILE="automation/logs/SAM_SCAN_LOG.md"
+
+          NAICS_CODES=("484110" "493110" "541614" "488510" "492110")
+          PTYPES="o,p,k,r"
+
+          echo "# Weekly GovCon Opportunity Scan — ${FILE_DATE}" > /tmp/scan_results.md
+          echo "Role: govcon-capture-analyst (automated via GitHub Actions)" >> /tmp/scan_results.md
+          echo "Date: ${FILE_DATE} | Posted window: ${FROM_DATE} → ${TODAY}" >> /tmp/scan_results.md
+          echo "NAICS: 484110 · 493110 · 541614 · 488510 · 492110" >> /tmp/scan_results.md
+          echo "Set-aside filter: SDVOSBC (primary) + HZC (secondary)" >> /tmp/scan_results.md
+          echo "" >> /tmp/scan_results.md
+          echo "---" >> /tmp/scan_results.md
+          echo "" >> /tmp/scan_results.md
+
+          TOTAL_OPPS=0
+          declare -A SEEN_SOLNUMS
+
+          for NAICS in "${NAICS_CODES[@]}"; do
+            for SETASIDE in "SDVOSBC" "HZC" "SDVOSBS" "HZS" "VSA"; do
+              RESPONSE=$(curl -s "https://api.sam.gov/opportunities/v2/search?api_key=${SAM_API_KEY}&postedFrom=${FROM_DATE}&postedTo=${TODAY}&ncode=${NAICS}&typeOfSetAside=${SETASIDE}&ptype=${PTYPES}&limit=100")
+              COUNT=$(echo "$RESPONSE" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('totalRecords',0))" 2>/dev/null || echo "0")
+              if [ "$COUNT" -gt "0" ]; then
+                echo "$RESPONSE" >> /tmp/raw_${NAICS}_${SETASIDE}.json
+                echo "Found $COUNT for NAICS $NAICS / $SETASIDE"
+                TOTAL_OPPS=$((TOTAL_OPPS + COUNT))
+              fi
+            done
+          done
+
+          # Parse and format results
+          python3 << 'PYEOF'
+          import json, glob, os, sys
+          from datetime import datetime
+
+          results = []
+          seen = set()
+
+          for f in glob.glob('/tmp/raw_*.json'):
+              try:
+                  with open(f) as fh:
+                      data = json.load(fh)
+                  opps = data.get('opportunitiesData', [])
+                  for opp in opps:
+                      sol = opp.get('solicitationNumber','') or opp.get('noticeId','')
+                      if sol in seen:
+                          continue
+                      seen.add(sol)
+                      results.append({
+                          'title': opp.get('title','N/A'),
+                          'solnum': sol,
+                          'naics': opp.get('naicsCode',''),
+                          'setaside': opp.get('setAside','') or opp.get('typeOfSetAside',''),
+                          'setaside_code': opp.get('setAsideCode',''),
+                          'deadline': opp.get('reponseDeadLine','') or opp.get('responseDeadLine',''),
+                          'posted': opp.get('postedDate',''),
+                          'agency': opp.get('fullParentPathName',''),
+                          'type': opp.get('type',''),
+                          'active': opp.get('active',''),
+                          'ui_link': opp.get('uiLink',''),
+                      })
+              except Exception as e:
+                  print(f"Error parsing {f}: {e}", file=sys.stderr)
+
+          with open('/tmp/parsed_results.json', 'w') as f:
+              json.dump(results, f, indent=2)
+
+          print(f"Total unique opportunities: {len(results)}")
+          PYEOF
+
+          # Build the scan markdown
+          UNIQUE=$(python3 -c "import json; d=json.load(open('/tmp/parsed_results.json')); print(len(d))" 2>/dev/null || echo "0")
+
+          cat >> /tmp/scan_results.md << EOF
+          ## SCAN RESULTS — ${UNIQUE} unique opportunities found
+
+          | # | Title | Sol # | NAICS | Set-Aside | Deadline | Agency |
+          |---|---|---|---|---|---|---|
+          EOF
+
+          python3 << 'PYEOF'
+          import json
+          with open('/tmp/parsed_results.json') as f:
+              results = json.load(f)
+          with open('/tmp/scan_results.md', 'a') as out:
+              for i, r in enumerate(results, 1):
+                  title = r['title'][:60].replace('|','/')
+                  sol = r['solnum'][:20]
+                  naics = r['naics']
+                  sa = r['setaside'][:20].replace('|','/')
+                  dl = r['deadline'][:10] if r['deadline'] else 'N/A'
+                  agency = r['agency'][:40].replace('|','/') if r['agency'] else 'N/A'
+                  out.write(f"| {i} | {title} | {sol} | {naics} | {sa} | {dl} | {agency} |\n")
+          PYEOF
+
+          echo "" >> /tmp/scan_results.md
+          echo "---" >> /tmp/scan_results.md
+          echo "" >> /tmp/scan_results.md
+          echo "## BID/NO-BID SCORING" >> /tmp/scan_results.md
+          echo "" >> /tmp/scan_results.md
+          echo "Scoring (0-2 pts each): NAICS match | Past performance | Set-aside type | Value range (\$25K-\$250K sweet spot) | Agency relationship" >> /tmp/scan_results.md
+          echo "≥7 = Submit | 5-6 = Submit if bandwidth | <5 = Pass" >> /tmp/scan_results.md
+          echo "" >> /tmp/scan_results.md
+          echo "Automated scoring coming soon. President Hunter review required before any action." >> /tmp/scan_results.md
+          echo "" >> /tmp/scan_results.md
+          echo "## [DECISION NEEDED — PRESIDENT HUNTER]" >> /tmp/scan_results.md
+          echo "Review all opportunities above. Reply BID, CONDITIONAL BID, or PASS for each." >> /tmp/scan_results.md
+
+          # Save scan file
+          mkdir -p govcon/opportunities
+          cp /tmp/scan_results.md "$SCAN_FILE"
+
+          # Update SAM_SCAN_LOG.md
+          TIMESTAMP=$(date +%Y-%m-%d)
+          mkdir -p automation/logs
+          if [ ! -f "$LOG_FILE" ]; then
+            echo "# SAM_SCAN_LOG.md — H&C PRECISE LOGISTICS LLC" > "$LOG_FILE"
+            echo "| Date | Status | Opps Found | Bid Candidates | Notes |" >> "$LOG_FILE"
+            echo "|---|---|---|---|---|" >> "$LOG_FILE"
+          fi
+          sed -i "/^| Date /a | ${TIMESTAMP} | COMPLETE | ${UNIQUE} | [AWAITING REVIEW] | Auto-scan via GitHub Actions |" "$LOG_FILE"
+
+          echo "Scan complete. $UNIQUE opportunities written to $SCAN_FILE"
+
+      - name: Commit scan results
+        run: |
+          git config user.name "hcprelog-ops-bot"
+          git config user.email "dennis@hcprelog.com"
+          FILE_DATE=$(date +%Y-%m-%d)
+          SCAN_FILE="govcon/opportunities/${FILE_DATE}-weekly-scan.md"
+          UNIQUE=$(python3 -c "import json; d=json.load(open('/tmp/parsed_results.json')); print(len(d))" 2>/dev/null || echo "0")
+          git add govcon/opportunities/ automation/logs/SAM_SCAN_LOG.md
+          git diff --staged --quiet || git commit -m "[${FILE_DATE}] govcon: weekly scan — ${UNIQUE} opportunities found [automated]"
+          git push
