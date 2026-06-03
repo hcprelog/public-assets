@@ -15,6 +15,7 @@ SDVOSB | HUBZone Certified | Durham, NC
 dennis@hcprelog.com
 hcprelog.com"""
 
+# Tri City Logistics removed — INTERESTED, Chad replied 2026-06-03, call (423) 502-0803
 emails = [
     {
         "to": "eccconline@gmail.com",
@@ -25,11 +26,6 @@ emails = [
         "to": "info@courierva.com",
         "subject": "VA Hospital Courier Contract - Veteran-to-Veteran Partnership Opportunity",
         "body": "Hi Bruce,\n\nMy name is Dennis Hunter - I'm a fellow veteran and President of H&C Precise Logistics LLC, an SDVOSB and HUBZone certified federal contractor based in Durham, NC.\n\nI'm reaching out veteran-to-veteran because we've identified an active VA hospital contract for courier services in the Hampton, Virginia area (Solicitation 36C24626Q0536). It's set aside for veteran-owned businesses - which means H&C has the certification to prime it, but we need a strong local execution partner in Hampton Roads to run the routes.\n\nHere's how it works:\n\n- H&C holds the prime contract - we handle all the compliance, billing, and government requirements\n- You run the routes locally, exactly as you do now for your current clients\n- We pay you Net 30 once the government pays us - steady, guaranteed income\n- If you're not SAM.gov registered yet, we walk you through it at no cost\n\nThe deadline on this solicitation is early June, so time is short. I'd love 15 minutes to walk you through the full picture - veteran to veteran.\n\nCan we connect this week?" + SIG,
-    },
-    {
-        "to": "dispatch@tricitylogistics.com",
-        "subject": "VA Medical Center Courier Contract - Local Partner Needed in Kingsport/Johnson City",
-        "body": "Hi Chad and Josh,\n\nMy name is Dennis Hunter, President of H&C Precise Logistics - we're an SDVOSB and HUBZone certified federal contractor based in Durham, NC.\n\nI'm reaching out because we've identified an active contract with the James H. Quillen VA Medical Center in Mountain Home, Tennessee (Solicitation 36C24926Q0230) for courier and delivery services. Kingsport is about 20 minutes from that facility - which puts Tri City Logistics in a prime position to be our execution partner on this contract.\n\nHere's the arrangement:\n\n- H&C wins the prime contract and handles all compliance, billing, and VA coordination\n- Tri City Logistics runs the routes from the Tri-Cities area to Mountain Home VAMC\n- We pay you Net 30 - guaranteed federal payment once the government pays us\n- No government contracting experience required on your end\n\nThe deadline on this solicitation is June 9, so I want to move quickly. Would you have 15 minutes for a call this week?" + SIG,
     },
     {
         "to": "info@allstatecouriers.com",
@@ -52,4 +48,4 @@ for email in emails:
     print(f"SENT: {email['subject']} -> {email['to']}")
 
 server.quit()
-print("All 4 emails sent.")
+print("All emails sent.")
