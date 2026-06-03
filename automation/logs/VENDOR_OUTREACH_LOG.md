@@ -29,7 +29,7 @@ Last updated: 2026-06-02 | Managed by: monitor-vendor-replies.yml (GitHub Action
 
 | Date | Company | Email | Action | Result | Thread ID |
 |---|---|---|---|---|---|
-| — | — | — | — | — | — |
+| 2026-06-03 | Tri City Logistics (Chad) | dispatch@tricitylogistics.com | Reply received | INTERESTED — "Yes, please call me on my cell." Cell: (423) 502-0803 | — |
 
 ---
 

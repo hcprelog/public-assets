@@ -103,8 +103,8 @@ H&C's value proposition: "You're registered but not winning because you don't ha
 | Contacts | Chad Domby + Josh Olinger |
 | Services | Freight carrier, Kingsport/Tri-Cities area |
 | SAM Registered | Unknown — check before outreach |
-| Status | **EMAIL SENT 2026-06-02** |
-| Notes | Kingsport is 20 min from Mountain Home VA. Direct contact available — fastest path to outreach. |
+| Status | **INTERESTED — replied 2026-06-03. Chad said "Yes, please call me on my cell phone." Cell: (423) 502-0803** |
+| Notes | Kingsport is 20 min from Mountain Home VA. CALL CHAD NOW at (423) 502-0803 — move to SOP-001 Step 7. |
 
 ### Tri Cities Solutions LLC
 | Field | Detail |
