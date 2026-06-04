@@ -1,0 +1,167 @@
+name: Instagram Daily Post
+
+on:
+  schedule:
+    # 9 AM ET = 13:00 UTC (EST) / 14:00 UTC (EDT)
+    # Runs Mon-Fri
+    - cron: '0 13 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      topic:
+        description: 'Custom post topic (optional)'
+        required: false
+        default: ''
+
+jobs:
+  post-to-instagram:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install anthropic requests pillow
+
+      - name: Generate caption and image, post to Instagram
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          INSTAGRAM_USER_ID: ${{ secrets.INSTAGRAM_USER_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          CUSTOM_TOPIC: ${{ github.event.inputs.topic }}
+        run: |
+          python3 << 'PYEOF'
+          import anthropic
+          import requests
+          import os
+          import json
+          import random
+          from datetime import datetime
+
+          # ── Config ──────────────────────────────────────────────
+          IG_USER_ID = os.environ["INSTAGRAM_USER_ID"]
+          IG_TOKEN   = os.environ["INSTAGRAM_ACCESS_TOKEN"]
+          CUSTOM_TOPIC = os.environ.get("CUSTOM_TOPIC", "").strip()
+
+          TOPICS = [
+              "federal contract logistics and supply chain excellence",
+              "veteran-owned small business success in government contracting",
+              "last-mile delivery solutions for federal agencies",
+              "SDVOSB set-aside contract opportunities",
+              "precision logistics for VA medical supply chains",
+              "compliance and reliability in federal transportation",
+              "building trust as a small business government contractor",
+              "logistics innovation supporting military and federal operations",
+              "H&C Precise Logistics mission and values",
+              "tips for winning federal logistics contracts",
+          ]
+
+          topic = CUSTOM_TOPIC if CUSTOM_TOPIC else random.choice(TOPICS)
+          today = datetime.now().strftime("%A, %B %d, %Y")
+          print(f"Topic: {topic}")
+          print(f"Date: {today}")
+
+          # ── Step 1: Generate caption via Claude ─────────────────
+          client = anthropic.Anthropic()
+          caption_prompt = f"""You are the social media voice for H&C Precise Logistics LLC, a Service-Disabled Veteran-Owned Small Business (SDVOSB) specializing in federal government logistics, last-mile delivery, and supply chain solutions.
+
+          Write an Instagram caption for today ({today}) on this topic: {topic}
+
+          Requirements:
+          - Professional, confident, and mission-driven tone
+          - 3-5 sentences max
+          - Include 1 relevant call to action
+          - End with 8-12 relevant hashtags including #SDVOSB #FederalContracting #HCPreciseLogistics #GovCon
+          - No emojis in excess — keep it sharp and credible
+          - Do NOT use quotes around the caption, just write it directly
+
+          Write only the caption text, nothing else."""
+
+          message = client.messages.create(
+              model="claude-opus-4-6",
+              max_tokens=500,
+              messages=[{"role": "user", "content": caption_prompt}]
+          )
+          caption = message.content[0].text.strip()
+          print(f"\nCaption generated:\n{caption}\n")
+
+          # ── Step 2: Generate image via Pollinations (free, no key needed) ──
+          # Using Pollinations.ai as free DALL-E alternative
+          # Switch to DALL-E once OPENAI_API_KEY secret is added
+          image_prompt = f"Professional corporate logistics photography: {topic}. Clean, modern, federal government contractor aesthetic. Dark navy and gold color scheme. No text in image. Photorealistic, high quality."
+          
+          import urllib.parse
+          encoded_prompt = urllib.parse.quote(image_prompt)
+          image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1080&height=1080&seed={random.randint(1,9999)}&nologo=true"
+          
+          print(f"Generating image from: {image_url[:80]}...")
+
+          # Verify image is accessible
+          img_check = requests.get(image_url, timeout=60)
+          if img_check.status_code != 200:
+              raise Exception(f"Image generation failed: HTTP {img_check.status_code}")
+          print(f"Image generated successfully ({len(img_check.content)} bytes)")
+
+          # ── Step 3: Create Instagram media container ────────────
+          print("\nCreating Instagram media container...")
+          container_resp = requests.post(
+              f"https://graph.facebook.com/v25.0/{IG_USER_ID}/media",
+              data={
+                  "image_url": image_url,
+                  "caption": caption,
+                  "access_token": IG_TOKEN
+              }
+          )
+          container_data = container_resp.json()
+          print(f"Container response: {container_data}")
+
+          if "id" not in container_data:
+              raise Exception(f"Failed to create container: {container_data}")
+
+          container_id = container_data["id"]
+          print(f"Container ID: {container_id}")
+
+          # ── Step 4: Wait for container to be ready ──────────────
+          import time
+          print("Waiting for container to process...")
+          for attempt in range(10):
+              time.sleep(6)
+              status_resp = requests.get(
+                  f"https://graph.facebook.com/v25.0/{container_id}",
+                  params={"fields": "status_code", "access_token": IG_TOKEN}
+              )
+              status = status_resp.json().get("status_code", "")
+              print(f"  Attempt {attempt+1}: status = {status}")
+              if status == "FINISHED":
+                  break
+              if status == "ERROR":
+                  raise Exception("Container processing failed with ERROR status")
+          else:
+              raise Exception("Container never reached FINISHED status")
+
+          # ── Step 5: Publish ─────────────────────────────────────
+          print("\nPublishing to Instagram...")
+          publish_resp = requests.post(
+              f"https://graph.facebook.com/v25.0/{IG_USER_ID}/media_publish",
+              data={
+                  "creation_id": container_id,
+                  "access_token": IG_TOKEN
+              }
+          )
+          publish_data = publish_resp.json()
+          print(f"Publish response: {publish_data}")
+
+          if "id" not in publish_data:
+              raise Exception(f"Publish failed: {publish_data}")
+
+          post_id = publish_data["id"]
+          print(f"\n✅ SUCCESS — Post ID: {post_id}")
+          print(f"Posted to @hc_precise_logistics")
+          print(f"Topic: {topic}")
+          PYEOF
