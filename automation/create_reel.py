@@ -37,8 +37,8 @@ IG_API_BASE = "https://graph.facebook.com/v25.0"
 # ── Avatar image URLs (hosted in this repo via GitHub Pages) ──────────────────
 # After uploading avatar images to the repo, update these paths
 AVATAR_IMAGES = {
-    "marcus":  "https://hcprelog.github.io/public-assets/avatars/marcus-hale.jpg",
-    "arielle": "https://hcprelog.github.io/public-assets/avatars/arielle-grant.jpg",
+    "marcus":  "https://hcprelog.github.io/public-assets/avatars/Marcus%20Hale.png",
+    "arielle": "https://hcprelog.github.io/public-assets/avatars/Arielle%20Grant.png",
 }
 
 # Fallback: professional stock images if avatars not yet uploaded

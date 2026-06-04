@@ -39,9 +39,9 @@ AVATAR_RATE    = 0.25 # 25% of posts use a brand avatar
 # Permanent brand avatar images — upload once to repo via GitHub web UI
 # Path: avatars/marcus-hale.jpg and avatars/arielle-grant.jpg
 AVATAR_IMAGES = {
-    "marcus":  "https://hcprelog.github.io/public-assets/avatars/marcus-hale.jpg",
-    "arielle": "https://hcprelog.github.io/public-assets/avatars/arielle-grant.jpg",
-    "dennis":  "https://hcprelog.github.io/public-assets/avatars/marcus-hale.jpg",  # fallback to marcus until dennis photo added
+    "marcus":  "https://hcprelog.github.io/public-assets/avatars/Marcus%20Hale.png",
+    "arielle": "https://hcprelog.github.io/public-assets/avatars/Arielle%20Grant.png",
+    "dennis":  "https://hcprelog.github.io/public-assets/avatars/Marcus%20Hale.png",  # fallback to marcus until dennis photo added
 }
 
 # Expanded Unsplash pool (20 images) — tracked to prevent repeats
