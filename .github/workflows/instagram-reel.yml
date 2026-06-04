@@ -1,17 +1,12 @@
-name: Instagram Daily Post
+name: Instagram Reels Creator
 
 on:
   schedule:
-    - cron: '0 13 * * 1-5'
-  workflow_dispatch:
-    inputs:
-      dry_run:
-        description: 'Dry run - generate but do not post'
-        required: false
-        default: 'false'
+    - cron: '0 14 * * 3'
+  workflow_dispatch: {}
 
 jobs:
-  post:
+  reel:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -23,10 +18,13 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install anthropic openai
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
-      - name: Post to Instagram
+      - name: Install Python dependencies
+        run: pip install anthropic openai pynacl
+
+      - name: Create and post Reel
         env:
           INSTAGRAM_USER_ID:      ${{ secrets.INSTAGRAM_USER_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
@@ -35,5 +33,4 @@ jobs:
           HF_TOKEN:               ${{ secrets.HF_TOKEN }}
           GITHUB_TOKEN:           ${{ secrets.GH_PAT }}
           GITHUB_REPOSITORY:      ${{ github.repository }}
-          DRY_RUN:                ${{ github.event.inputs.dry_run }}
-        run: python automation/post_instagram.py
+        run: python automation/create_reel.py

@@ -2,32 +2,30 @@ name: Refresh Instagram Token
 
 on:
   schedule:
-    # Run every 45 days at 8 AM ET (12:00 UTC)
-    # Token valid 60 days — refresh at 45 to be safe
-    - cron: '0 12 */45 * *'
-  workflow_dispatch:
+    - cron: '0 12 1 */2 *'
+  workflow_dispatch: {}
 
 jobs:
-  refresh-token:
+  refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    permissions:
+      contents: read
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
-        run: pip install pynacl requests
+      - name: Install pynacl
+        run: pip install pynacl
 
-      - name: Refresh Instagram access token
+      - name: Refresh Instagram token
         env:
-          INSTAGRAM_APP_ID: ${{ secrets.INSTAGRAM_APP_ID }}
-          INSTAGRAM_APP_SECRET: ${{ secrets.INSTAGRAM_APP_SECRET }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          INSTAGRAM_APP_ID:       ${{ secrets.INSTAGRAM_APP_ID }}
+          INSTAGRAM_APP_SECRET:   ${{ secrets.INSTAGRAM_APP_SECRET }}
+          GITHUB_TOKEN:           ${{ secrets.GH_PAT }}
+          GITHUB_REPOSITORY:      ${{ github.repository }}
         run: python automation/refresh_instagram_token.py
