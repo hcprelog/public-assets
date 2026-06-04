@@ -33,15 +33,39 @@ IG_API_BASE    = "https://graph.facebook.com/v25.0"
 TOPICS_FILE    = "automation/topics.json"
 USED_FILE      = "automation/used_topics.json"
 TOPIC_MEMORY   = 15   # avoid repeating any of last N topics
+IMAGE_MEMORY   = 10   # avoid repeating any of last N Unsplash images
+AVATAR_RATE    = 0.25 # 25% of posts use a brand avatar
 
+# Permanent brand avatar images — upload once to repo via GitHub web UI
+# Path: avatars/marcus-hale.jpg and avatars/arielle-grant.jpg
+AVATAR_IMAGES = {
+    "marcus":  "https://hcprelog.github.io/public-assets/avatars/marcus-hale.jpg",
+    "arielle": "https://hcprelog.github.io/public-assets/avatars/arielle-grant.jpg",
+    "dennis":  "https://hcprelog.github.io/public-assets/avatars/marcus-hale.jpg",  # fallback to marcus until dennis photo added
+}
+
+# Expanded Unsplash pool (20 images) — tracked to prevent repeats
 UNSPLASH_IMAGES = [
-    "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1080&q=85",  # logistics warehouse
-    "https://images.unsplash.com/photo-1553413077-190dd305871c?w=1080&q=85",  # supply chain
-    "https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?w=1080&q=85",  # cargo
-    "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1080&q=85",  # government building
-    "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1080&q=85",  # business contract
-    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1080&q=85",  # professional
-    "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1080&q=85",  # business woman
+    "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1080&q=85",
+    "https://images.unsplash.com/photo-1553413077-190dd305871c?w=1080&q=85",
+    "https://images.unsplash.com/photo-1494412574643-ff11b0a5c1c3?w=1080&q=85",
+    "https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1080&q=85",
+    "https://images.unsplash.com/photo-1450101499163-c8848c66ca85?w=1080&q=85",
+    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1080&q=85",
+    "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1080&q=85",
+    "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1080&q=85",
+    "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=1080&q=85",
+    "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=1080&q=85",
+    "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=1080&q=85",
+    "https://images.unsplash.com/photo-1556761175-4b46a572b786?w=1080&q=85",
+    "https://images.unsplash.com/photo-1497366216548-37526070297c?w=1080&q=85",
+    "https://images.unsplash.com/photo-1568992687947-868a62a9f521?w=1080&q=85",
+    "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1080&q=85",
+    "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=1080&q=85",
+    "https://images.unsplash.com/photo-1431540015161-0bf868a2d407?w=1080&q=85",
+    "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1080&q=85",
+    "https://images.unsplash.com/photo-1572021335469-31706a17aaef?w=1080&q=85",
+    "https://images.unsplash.com/photo-1664575602554-2087b04935a5?w=1080&q=85",
 ]
 
 # ── HTTP helper ───────────────────────────────────────────────────────────────
@@ -111,10 +135,17 @@ def pick_topic():
     print(f"[Topic] Selected: {chosen['title']} (id={chosen['id']}, avatar={chosen['avatar']})")
     return chosen, used_data or {"used": []}, used_sha
 
-def mark_topic_used(topic, used_data, used_sha):
-    """Append topic ID to used list and push back to repo."""
+def mark_topic_used(topic, image_url, image_source, used_data, used_sha):
+    """Append topic ID and image URL to used lists and push back to repo."""
     used_data["used"].append(topic["id"])
-    used_data["used"] = used_data["used"][-50:]  # keep last 50
+    used_data["used"] = used_data["used"][-50:]
+
+    # Track used images to prevent Unsplash repeats
+    if image_source == "unsplash":
+        used_images = used_data.get("used_images", [])
+        used_images.append(image_url)
+        used_data["used_images"] = used_images[-20:]
+
     used_data["last_posted"] = datetime.now(timezone.utc).isoformat()
     ok = gh_put_file(
         USED_FILE, used_data, used_sha,
@@ -252,22 +283,48 @@ def upload_image_to_pages(img_bytes, topic_id):
     print(f"[Image] GitHub Pages upload failed: {status}")
     return None
 
-def pick_unsplash_image():
-    """Rotate through curated Unsplash images based on day of week."""
-    idx = datetime.now(timezone.utc).weekday() % len(UNSPLASH_IMAGES)
-    url = UNSPLASH_IMAGES[idx]
-    print(f"[Image] Using Unsplash fallback #{idx+1}")
+def pick_unsplash_image(used_data):
+    """
+    Pick an Unsplash image not used in the last IMAGE_MEMORY posts.
+    Tracks used images in used_topics.json to prevent repeats.
+    """
+    used_images = used_data.get("used_images", [])
+    recent = set(used_images[-IMAGE_MEMORY:])
+    available = [u for u in UNSPLASH_IMAGES if u not in recent]
+    if not available:
+        available = UNSPLASH_IMAGES  # full reset if all used
+    url = random.choice(available)
+    print(f"[Image] Using Unsplash (pool={len(available)} available)")
     return url
 
-def get_image(topic):
-    """Try DALL-E 3 → FLUX.1 → Unsplash, return public image URL."""
+def get_avatar_image(topic):
+    """
+    Return the avatar URL for this topic's assigned avatar.
+    Only used AVATAR_RATE (25%) of the time.
+    """
+    avatar_key = topic.get("avatar", "arielle")
+    url = AVATAR_IMAGES.get(avatar_key, AVATAR_IMAGES["arielle"])
+    print(f"[Image] Using brand avatar: {avatar_key}")
+    return url
+
+def get_image(topic, used_data):
+    """
+    Image selection logic:
+    - 25% of posts: use brand avatar (Marcus or Arielle)
+    - 75% of posts: DALL-E 3 → Unsplash (no repeats)
+    """
+    # 25% avatar roll
+    if random.random() < AVATAR_RATE:
+        url = get_avatar_image(topic)
+        return url, "avatar"
+
+    # 75%: try DALL-E 3 first
     url = gen_image_dalle3(topic)
     if url:
         return url, "dalle3"
-    url = gen_image_flux(topic)
-    if url:
-        return url, "flux"
-    url = pick_unsplash_image()
+
+    # Unsplash with repeat-prevention
+    url = pick_unsplash_image(used_data)
     return url, "unsplash"
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -427,8 +484,8 @@ def main():
     # Step 1: Pick topic (Item 3 — rotation)
     topic, used_data, used_sha = pick_topic()
 
-    # Step 2: Generate image (Item 1 — DALL-E 3 / FLUX / Unsplash)
-    image_url, image_source = get_image(topic)
+    # Step 2: Generate image (Item 1 — Avatar 25% / DALL-E 3 / Unsplash)
+    image_url, image_source = get_image(topic, used_data)
     print(f"[Image] Source: {image_source} | URL: {image_url[:80]}...")
 
     # Step 3: Generate caption
@@ -439,7 +496,7 @@ def main():
 
     # Step 5: Mark topic as used (only if post succeeded)
     if success:
-        mark_topic_used(topic, used_data, used_sha)
+        mark_topic_used(topic, image_url, image_source, used_data, used_sha)
         print(f"\n✓ Post complete | Topic: {topic['id']} | Image: {image_source}")
     else:
         print(f"\n✗ Post failed — topic NOT marked used, will retry tomorrow")
