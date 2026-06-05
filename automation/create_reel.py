@@ -36,10 +36,11 @@ GITHUB_REPO            = os.environ.get("GITHUB_REPOSITORY", "hcprelog/public-as
 IG_API_BASE  = "https://graph.facebook.com/v25.0"
 D_ID_API_BASE = "https://api.d-id.com"
 
-# ── Brand avatars (GitHub Pages) ──────────────────────────────────────────────
+# ── Brand avatars ─────────────────────────────────────────────────────────────
+# Using raw.githubusercontent.com — served directly, no CDN delay, no Pages propagation
 AVATAR_IMAGES = {
-    "marcus":  "https://hcprelog.github.io/public-assets/avatars/Marcus%20Hale.png",
-    "arielle": "https://hcprelog.github.io/public-assets/avatars/Arielle%20Grant.png",
+    "marcus":  "https://raw.githubusercontent.com/hcprelog/public-assets/main/avatars/Marcus%20Hale.png",
+    "arielle": "https://raw.githubusercontent.com/hcprelog/public-assets/main/avatars/Arielle%20Grant.png",
 }
 
 # Microsoft Neural TTS voices via D-ID
@@ -166,9 +167,11 @@ def fallback_script(topic):
 def create_did_talk(avatar_url, script, avatar_key):
     """
     Submit a talking video request to D-ID API.
+    Retries up to 3 times — D-ID's rekognition step can fail transiently.
     Returns the talk ID for polling.
     """
     print(f"\n[D-ID] Creating talk for avatar: {avatar_key}")
+    print(f"[D-ID] Image URL: {avatar_url}")
     print(f"[D-ID] Script preview: {script[:80]}...")
 
     voice = AVATAR_VOICES.get(avatar_key, AVATAR_VOICES["arielle"])
@@ -190,24 +193,31 @@ def create_did_talk(avatar_url, script, avatar_key):
         },
     }
 
-    status, resp = http("POST", f"{D_ID_API_BASE}/talks", headers=d_id_headers(), data=body, timeout=30)
+    for attempt in range(1, 4):  # 3 attempts
+        print(f"[D-ID] Attempt {attempt}/3...")
+        status, resp = http("POST", f"{D_ID_API_BASE}/talks", headers=d_id_headers(), data=body, timeout=30)
 
-    if status in (200, 201) and "id" in resp:
-        talk_id = resp["id"]
-        print(f"[D-ID] Talk created: {talk_id}")
-        return talk_id
+        if status in (200, 201) and "id" in resp:
+            talk_id = resp["id"]
+            print(f"[D-ID] Talk created: {talk_id} ✓")
+            return talk_id
 
-    print(f"[D-ID] Creation error {status}: {resp}")
+        error_msg = str(resp)
+        print(f"[D-ID] Attempt {attempt} error {status}: {error_msg[:200]}")
 
-    # Diagnose common errors
-    error_msg = str(resp)
-    if "credits" in error_msg.lower() or "limit" in error_msg.lower():
-        print("[D-ID] Out of credits. Add credits at: https://studio.d-id.com/settings")
-    elif status == 401:
-        print("[D-ID] Auth failed. Check D_ID_API_KEY secret.")
-    elif "face" in error_msg.lower():
-        print("[D-ID] Could not detect face in avatar image. Check avatar URL is accessible.")
+        if status == 401:
+            print("[D-ID] Auth failed — check D_ID_API_KEY secret")
+            return None
+        if "credits" in error_msg.lower() or "quota" in error_msg.lower():
+            print("[D-ID] Out of credits — add credits at studio.d-id.com/settings")
+            return None
+        if "rekognition" in error_msg.lower() or status == 500:
+            print(f"[D-ID] AWS Rekognition transient error — waiting 15s before retry...")
+            if attempt < 3:
+                time.sleep(15)
+            continue
 
+    print("[D-ID] All 3 attempts failed")
     return None
 
 def poll_did_talk(talk_id, max_wait=180):
