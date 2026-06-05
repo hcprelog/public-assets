@@ -44,9 +44,26 @@ AVATAR_IMAGES = {
 }
 
 # Microsoft Neural TTS voices via D-ID
+# Marcus: ChristopherNeural — deep, authoritative, professional male
+# Arielle: AriaNeural — clear, warm, professional female
 AVATAR_VOICES = {
-    "marcus":  {"type": "microsoft", "voice_id": "en-US-DavisNeural"},
-    "arielle": {"type": "microsoft", "voice_id": "en-US-JennyNeural"},
+    "marcus":  {"type": "microsoft", "voice_id": "en-US-ChristopherNeural"},
+    "arielle": {"type": "microsoft", "voice_id": "en-US-AriaNeural"},
+}
+
+# Acronym expansion — D-ID TTS will mispronounce these if left as-is
+ACRONYM_MAP = {
+    "SDVOSB":   "Service-Disabled Veteran-Owned Small Business",
+    "HubZone":  "Hub Zone",
+    "GovCon":   "government contracting",
+    "SAM.gov":  "SAM dot gov",
+    "DoD":      "Department of Defense",
+    "NAICS":    "NAY-icks",
+    "RFP":      "Request for Proposal",
+    "PWS":      "Performance Work Statement",
+    "SBA":      "Small Business Administration",
+    "CTA":      "call to action",
+    "hcprelog.com": "H C prelog dot com",
 }
 
 # ── Weekly Reel topics ────────────────────────────────────────────────────────
@@ -105,21 +122,40 @@ def d_id_headers():
 # STEP 1 — SCRIPT GENERATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def preprocess_script(script):
+    """
+    Replace acronyms and technical shorthand with their full spoken forms
+    so D-ID TTS pronounces everything correctly and naturally.
+    """
+    import re
+    result = script
+    for acronym, expansion in ACRONYM_MAP.items():
+        # Word-boundary match, case-sensitive for acronyms
+        result = re.sub(rf'\b{re.escape(acronym)}\b', expansion, result)
+    return result
+
 def generate_script(topic):
     """
     Generate a 30-45 second speaking script (~75-100 words).
     Structured as: hook → 2-3 insights → CTA
     """
     if not ANTHROPIC_API_KEY:
-        return fallback_script(topic)
+        return preprocess_script(fallback_script(topic))
 
     persona = AVATAR_PERSONAS.get(topic["avatar"], AVATAR_PERSONAS["arielle"])
     system = (
         f"{persona} "
         f"Company: H&C PRECISE LOGISTICS LLC. Website: hcprelog.com. "
-        f"RULE: Always say 'H&C PRECISE LOGISTICS LLC' — exact name. "
-        f"Speak naturally as if on camera. No stage directions. No asterisks. "
-        f"Pure spoken words only."
+        f"RULES: "
+        f"1. Always say 'H&C PRECISE LOGISTICS LLC' — exact name. "
+        f"2. NEVER use acronyms. Always say the full words: "
+        f"say 'Service-Disabled Veteran-Owned Small Business' not 'SDVOSB', "
+        f"say 'Hub Zone' not 'HubZone', "
+        f"say 'government contracting' not 'GovCon', "
+        f"say 'SAM dot gov' not 'SAM.gov', "
+        f"say 'Department of Defense' not 'DoD'. "
+        f"3. Speak naturally as if on camera. No stage directions. No asterisks. "
+        f"4. Pure spoken words only — no symbols, no slashes, no abbreviations."
     )
     user = (
         f"Write a 30-45 second video script (80-100 words) for an Instagram Reel.\n"
@@ -129,6 +165,7 @@ def generate_script(topic):
         f"2. Deliver 2-3 sharp, practical insights (no filler)\n"
         f"3. End with a clear CTA mentioning hcprelog.com\n\n"
         f"Write ONLY the spoken words. No labels. No directions. Natural speech rhythm.\n"
+        f"No acronyms. Spell everything out as it would be spoken aloud.\n"
         f"Stay under 100 words."
     )
     headers = {
@@ -145,11 +182,13 @@ def generate_script(topic):
     status, resp = http("POST", "https://api.anthropic.com/v1/messages", headers=headers, data=body, timeout=30)
     if status == 200:
         script = resp["content"][0]["text"].strip()
+        script = preprocess_script(script)  # catch any acronyms that slipped through
         word_count = len(script.split())
         print(f"[Script] Generated: {word_count} words (~{word_count//2}s speaking time)")
+        print(f"[Script] Preview: {script[:120]}...")
         return script
     print(f"[Script] Claude error {status}: {resp}")
-    return fallback_script(topic)
+    return preprocess_script(fallback_script(topic))
 
 def fallback_script(topic):
     return (
