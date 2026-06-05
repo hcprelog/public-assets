@@ -2,6 +2,7 @@ name: Instagram Reels Creator
 
 on:
   schedule:
+    # Wednesdays 10AM ET (14:00 UTC)
     - cron: '0 14 * * 3'
   workflow_dispatch: {}
 
@@ -18,19 +19,15 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
-
-      - name: Install Python dependencies
-        run: pip install anthropic openai pynacl
+      - name: Install dependencies
+        run: pip install anthropic
 
       - name: Create and post Reel
         env:
           INSTAGRAM_USER_ID:      ${{ secrets.INSTAGRAM_USER_ID }}
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           ANTHROPIC_API_KEY:      ${{ secrets.ANTHROPIC_API_KEY }}
-          OPENAI_API_KEY:         ${{ secrets.OPENAI_API_KEY }}
-          HF_TOKEN:               ${{ secrets.HF_TOKEN }}
+          D_ID_API_KEY:           ${{ secrets.D_ID_API_KEY }}
           GITHUB_TOKEN:           ${{ secrets.GH_PAT }}
           GITHUB_REPOSITORY:      ${{ github.repository }}
         run: python automation/create_reel.py

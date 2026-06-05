@@ -1,70 +1,77 @@
 """
-H&C PRECISE LOGISTICS LLC — Instagram Reels Creator
-Runs weekly (Wednesdays) via instagram-reel.yml
-Creates a branded 15-second Reel using:
-  - Avatar image (Marcus Hale or Arielle Grant)
-  - AI-generated caption/script from Claude
-  - FFmpeg for video assembly (pre-installed on GitHub Actions ubuntu runners)
-  - Hosts video on GitHub Pages for Instagram Graph API
-Posts via Instagram Graph API as a Reel.
+H&C PRECISE LOGISTICS LLC — Instagram Reels Creator (D-ID Talking Avatar)
+Runs weekly (Wednesdays 10AM ET) via instagram-reel.yml
+
+Pipeline:
+1. Pick a weekly Reel topic (Marcus or Arielle)
+2. Generate 30-45 second talking script via Claude
+3. Send avatar image + script to D-ID API → talking head MP4
+4. Upload video to GitHub Pages for public URL
+5. Post as Instagram Reel via Graph API
+
+D-ID Lite plan: $5.99/month = 10 min of video
+At 1 video/week (45s) = ~3 min/month — well within Lite tier
+Free trial: 20 credits (~5 min) covers initial testing
+Sign up + API key: https://studio.d-id.com
 """
 
 import os
 import json
-import subprocess
 import base64
+import time
+import sys
 import urllib.request
 import urllib.parse
 import urllib.error
-import time
-import sys
-import random
-import tempfile
 from datetime import datetime, timezone
-from pathlib import Path
 
 # ── Secrets ───────────────────────────────────────────────────────────────────
 INSTAGRAM_USER_ID      = os.environ["INSTAGRAM_USER_ID"]
 INSTAGRAM_ACCESS_TOKEN = os.environ["INSTAGRAM_ACCESS_TOKEN"]
 ANTHROPIC_API_KEY      = os.environ.get("ANTHROPIC_API_KEY", "")
-OPENAI_API_KEY         = os.environ.get("OPENAI_API_KEY", "")
-HF_TOKEN               = os.environ.get("HF_TOKEN", "")
+D_ID_API_KEY           = os.environ["D_ID_API_KEY"]
 GITHUB_TOKEN           = os.environ["GITHUB_TOKEN"]
 GITHUB_REPO            = os.environ.get("GITHUB_REPOSITORY", "hcprelog/public-assets")
 
-IG_API_BASE = "https://graph.facebook.com/v25.0"
+IG_API_BASE  = "https://graph.facebook.com/v25.0"
+D_ID_API_BASE = "https://api.d-id.com"
 
-# ── Avatar image URLs (hosted in this repo via GitHub Pages) ──────────────────
-# After uploading avatar images to the repo, update these paths
+# ── Brand avatars (GitHub Pages) ──────────────────────────────────────────────
 AVATAR_IMAGES = {
     "marcus":  "https://hcprelog.github.io/public-assets/avatars/Marcus%20Hale.png",
     "arielle": "https://hcprelog.github.io/public-assets/avatars/Arielle%20Grant.png",
 }
 
-# Fallback: professional stock images if avatars not yet uploaded
-AVATAR_FALLBACK = {
-    "marcus":  "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=1080&q=85",
-    "arielle": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=1080&q=85",
+# Microsoft Neural TTS voices via D-ID
+AVATAR_VOICES = {
+    "marcus":  {"type": "microsoft", "voice_id": "en-US-DavisNeural"},
+    "arielle": {"type": "microsoft", "voice_id": "en-US-JennyNeural"},
 }
 
-# ── H&C Brand colors ──────────────────────────────────────────────────────────
-HC_NAVY  = "0C1F3F"  # hex, no #
-HC_WHITE = "FFFFFF"
-HC_GOLD  = "C9A84C"
-
-# ── Reels topics (weekly rotation — different from daily posts) ────────────────
+# ── Weekly Reel topics ────────────────────────────────────────────────────────
 REEL_TOPICS = [
-    {"id": "r-bid-no-bid",     "avatar": "marcus",  "title": "3 Questions to Ask Before Bidding on Any Contract", "hook": "Stop bidding on contracts you cannot win."},
-    {"id": "r-sam-steps",      "avatar": "arielle", "title": "SAM.gov in 5 Steps",                                "hook": "Your first federal contract starts here."},
-    {"id": "r-sdvosb-power",   "avatar": "marcus",  "title": "Why SDVOSB Opens Doors Other Certs Don't",          "hook": "SDVOSB is more than a checkbox."},
-    {"id": "r-first-contract", "avatar": "arielle", "title": "How to Get Your First Government Contract",         "hook": "Zero federal history? Here is where you start."},
-    {"id": "r-cash-flow",      "avatar": "marcus",  "title": "GovCon Cash Flow Secrets",                          "hook": "Government pays well. Just not fast."},
-    {"id": "r-capability",     "avatar": "arielle", "title": "Your Capability Statement Checklist",               "hook": "One page. Your entire pitch to a contracting officer."},
-    {"id": "r-compliance",     "avatar": "marcus",  "title": "Compliance Matrix Breakdown",                       "hook": "This one document tells COs you are ready."},
-    {"id": "r-teaming",        "avatar": "marcus",  "title": "Teaming Your Way Into Bigger Contracts",            "hook": "You don't have to win alone."},
-    {"id": "r-hubzone",        "avatar": "arielle", "title": "HubZone: Are You Missing This Certification?",      "hook": "If you're in a HubZone, you have an unfair advantage waiting."},
-    {"id": "r-post-award",     "avatar": "marcus",  "title": "Post-Award Pitfalls to Avoid",                      "hook": "Most small businesses fail after the award. Don't be that company."},
+    {"id": "r-bid-no-bid",     "avatar": "marcus",  "title": "3 Questions to Ask Before Bidding on Any Contract"},
+    {"id": "r-sam-steps",      "avatar": "arielle", "title": "SAM.gov Registration in 5 Steps"},
+    {"id": "r-sdvosb-power",   "avatar": "marcus",  "title": "Why SDVOSB Opens Doors Other Certifications Don't"},
+    {"id": "r-first-contract", "avatar": "arielle", "title": "How to Get Your First Government Contract"},
+    {"id": "r-cash-flow",      "avatar": "marcus",  "title": "GovCon Cash Flow: What Nobody Tells You"},
+    {"id": "r-capability",     "avatar": "arielle", "title": "Your Capability Statement Checklist"},
+    {"id": "r-compliance",     "avatar": "marcus",  "title": "What a Compliance Matrix Actually Does"},
+    {"id": "r-teaming",        "avatar": "marcus",  "title": "How to Team Your Way Into Bigger Contracts"},
+    {"id": "r-hubzone",        "avatar": "arielle", "title": "HubZone: Are You Missing This Certification?"},
+    {"id": "r-post-award",     "avatar": "marcus",  "title": "Post-Award Pitfalls That Kill Small Businesses"},
 ]
+
+AVATAR_PERSONAS = {
+    "marcus": (
+        "You are Marcus Hale, GovCon Operations Advisor for H&C PRECISE LOGISTICS LLC. "
+        "Direct, credible, experienced federal contractor. No fluff. Practical insights only."
+    ),
+    "arielle": (
+        "You are Arielle Grant, Business Growth Advisor for H&C PRECISE LOGISTICS LLC. "
+        "Warm, encouraging, practical. You guide businesses through their first steps in GovCon."
+    ),
+}
 
 # ── HTTP helper ───────────────────────────────────────────────────────────────
 def http(method, url, headers=None, data=None, timeout=60):
@@ -72,8 +79,6 @@ def http(method, url, headers=None, data=None, timeout=60):
     if isinstance(data, dict):
         data = json.dumps(data).encode()
         headers.setdefault("Content-Type", "application/json")
-    elif isinstance(data, str):
-        data = data.encode()
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
@@ -86,258 +91,240 @@ def http(method, url, headers=None, data=None, timeout=60):
         except Exception:
             return e.code, {"error": body}
 
-# ── GitHub Pages file upload ──────────────────────────────────────────────────
-def upload_to_pages(local_path, repo_path, mime_hint="video/mp4"):
-    """Upload a local file to GitHub repo → served via GitHub Pages."""
+def d_id_headers():
+    """D-ID Basic auth: base64(api_key:)"""
+    encoded = base64.b64encode(f"{D_ID_API_KEY}:".encode()).decode()
+    return {
+        "Authorization": f"Basic {encoded}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 1 — SCRIPT GENERATION
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def generate_script(topic):
+    """
+    Generate a 30-45 second speaking script (~75-100 words).
+    Structured as: hook → 2-3 insights → CTA
+    """
+    if not ANTHROPIC_API_KEY:
+        return fallback_script(topic)
+
+    persona = AVATAR_PERSONAS.get(topic["avatar"], AVATAR_PERSONAS["arielle"])
+    system = (
+        f"{persona} "
+        f"Company: H&C PRECISE LOGISTICS LLC. Website: hcprelog.com. "
+        f"RULE: Always say 'H&C PRECISE LOGISTICS LLC' — exact name. "
+        f"Speak naturally as if on camera. No stage directions. No asterisks. "
+        f"Pure spoken words only."
+    )
+    user = (
+        f"Write a 30-45 second video script (80-100 words) for an Instagram Reel.\n"
+        f"Topic: {topic['title']}\n\n"
+        f"Structure:\n"
+        f"1. Open with a strong hook (1 sentence)\n"
+        f"2. Deliver 2-3 sharp, practical insights (no filler)\n"
+        f"3. End with a clear CTA mentioning hcprelog.com\n\n"
+        f"Write ONLY the spoken words. No labels. No directions. Natural speech rhythm.\n"
+        f"Stay under 100 words."
+    )
+    headers = {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+    }
+    body = {
+        "model": "claude-opus-4-5",
+        "max_tokens": 300,
+        "system": system,
+        "messages": [{"role": "user", "content": user}],
+    }
+    status, resp = http("POST", "https://api.anthropic.com/v1/messages", headers=headers, data=body, timeout=30)
+    if status == 200:
+        script = resp["content"][0]["text"].strip()
+        word_count = len(script.split())
+        print(f"[Script] Generated: {word_count} words (~{word_count//2}s speaking time)")
+        return script
+    print(f"[Script] Claude error {status}: {resp}")
+    return fallback_script(topic)
+
+def fallback_script(topic):
+    return (
+        f"If you're serious about government contracting, here's what most people miss about {topic['title'].lower()}. "
+        f"At H&C PRECISE LOGISTICS LLC, we help businesses navigate every step — "
+        f"from registration to your first awarded contract. "
+        f"SDVOSB and HubZone certified. Based in Durham, North Carolina. "
+        f"Start at hcprelog.com — the free GovCon Starter Academy is waiting for you."
+    )
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 2 — D-ID TALKING AVATAR VIDEO
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def create_did_talk(avatar_url, script, avatar_key):
+    """
+    Submit a talking video request to D-ID API.
+    Returns the talk ID for polling.
+    """
+    print(f"\n[D-ID] Creating talk for avatar: {avatar_key}")
+    print(f"[D-ID] Script preview: {script[:80]}...")
+
+    voice = AVATAR_VOICES.get(avatar_key, AVATAR_VOICES["arielle"])
+
+    body = {
+        "source_url": avatar_url,
+        "script": {
+            "type": "text",
+            "input": script,
+            "provider": {
+                "type": voice["type"],
+                "voice_id": voice["voice_id"],
+            },
+        },
+        "config": {
+            "fluent": True,
+            "pad_audio": 0.0,
+            "stitch": True,
+        },
+    }
+
+    status, resp = http("POST", f"{D_ID_API_BASE}/talks", headers=d_id_headers(), data=body, timeout=30)
+
+    if status in (200, 201) and "id" in resp:
+        talk_id = resp["id"]
+        print(f"[D-ID] Talk created: {talk_id}")
+        return talk_id
+
+    print(f"[D-ID] Creation error {status}: {resp}")
+
+    # Diagnose common errors
+    error_msg = str(resp)
+    if "credits" in error_msg.lower() or "limit" in error_msg.lower():
+        print("[D-ID] Out of credits. Add credits at: https://studio.d-id.com/settings")
+    elif status == 401:
+        print("[D-ID] Auth failed. Check D_ID_API_KEY secret.")
+    elif "face" in error_msg.lower():
+        print("[D-ID] Could not detect face in avatar image. Check avatar URL is accessible.")
+
+    return None
+
+def poll_did_talk(talk_id, max_wait=180):
+    """
+    Poll D-ID until video is ready or timeout.
+    D-ID typically takes 30-90 seconds for a 45-second video.
+    Returns the result_url or None.
+    """
+    print(f"[D-ID] Waiting for video to render (up to {max_wait}s)...")
+    start = time.time()
+    attempt = 0
+
+    while time.time() - start < max_wait:
+        time.sleep(8)
+        attempt += 1
+        status, resp = http("GET", f"{D_ID_API_BASE}/talks/{talk_id}", headers=d_id_headers(), timeout=15)
+
+        if status != 200:
+            print(f"[D-ID] Poll error {status}: {resp}")
+            continue
+
+        talk_status = resp.get("status", "")
+        print(f"[D-ID] Status [{attempt}]: {talk_status}")
+
+        if talk_status == "done":
+            result_url = resp.get("result_url")
+            if result_url:
+                print(f"[D-ID] Video ready: {result_url[:60]}...")
+                return result_url
+            print("[D-ID] Done but no result_url in response")
+            return None
+
+        if talk_status == "error":
+            error = resp.get("error", {})
+            print(f"[D-ID] Render error: {error}")
+            return None
+
+    print(f"[D-ID] Timeout after {max_wait}s")
+    return None
+
+def download_video(video_url, tmp_path):
+    """Download the D-ID video to a temp file."""
+    print(f"[Video] Downloading from D-ID...")
+    try:
+        urllib.request.urlretrieve(video_url, tmp_path)
+        import os as _os
+        size = _os.path.getsize(tmp_path)
+        print(f"[Video] Downloaded: {size:,} bytes ({size/1024/1024:.1f} MB)")
+        return True
+    except Exception as e:
+        print(f"[Video] Download failed: {e}")
+        return False
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 3 — UPLOAD TO GITHUB PAGES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def upload_to_pages(local_path, repo_path):
+    """Upload MP4 to GitHub repo → served via GitHub Pages as public URL."""
     with open(local_path, "rb") as f:
         raw = f.read()
     encoded  = base64.b64encode(raw).decode()
     gh_url   = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{repo_path}"
-    headers  = {"Authorization": f"token {GITHUB_TOKEN}", "Accept": "application/vnd.github.v3+json"}
-
-    # Check for existing file (need sha to update)
+    headers  = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    # Check for existing file sha
     status, existing = http("GET", gh_url, headers=headers, timeout=15)
     sha = existing.get("sha") if status == 200 else None
 
-    body = {"message": f"auto: reel upload {repo_path}", "content": encoded}
+    body = {"message": f"auto: reel {repo_path}", "content": encoded}
     if sha:
         body["sha"] = sha
 
-    status, resp = http("PUT", gh_url, headers=headers, data=body, timeout=60)
+    print(f"[Upload] Uploading video to GitHub Pages ({len(raw)/1024/1024:.1f} MB)...")
+    status, resp = http("PUT", gh_url, headers=headers, data=body, timeout=120)
+
     if status in (200, 201):
         public_url = f"https://hcprelog.github.io/public-assets/{repo_path}"
-        print(f"[Upload] {repo_path} → {public_url} ✓")
+        print(f"[Upload] Live at: {public_url}")
         return public_url
+
     print(f"[Upload] Failed {status}: {resp}")
     return None
 
-# ── Download file to temp ─────────────────────────────────────────────────────
-def download_file(url, dest_path):
-    try:
-        urllib.request.urlretrieve(url, dest_path)
-        size = Path(dest_path).stat().st_size
-        print(f"[Download] {url[:60]}... → {size:,} bytes")
-        return True
-    except Exception as e:
-        print(f"[Download] Failed: {e}")
-        return False
-
-# ── Generate background image (DALL-E 3 or fallback) ─────────────────────────
-def get_background_image(topic, tmp_dir):
-    """Generate or fetch a background image for the reel."""
-    bg_path = os.path.join(tmp_dir, "background.jpg")
-
-    # Try DALL-E 3
-    if OPENAI_API_KEY:
-        prompt = (
-            f"Professional, clean corporate background for a government contracting company. "
-            f"Abstract geometric shapes in navy blue (#0C1F3F) and white. "
-            f"Subtle, elegant, no text. Would work as a video background."
-        )
-        headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
-        body = {"model": "dall-e-3", "prompt": prompt, "n": 1, "size": "1024x1024", "quality": "standard"}
-        status, resp = http("POST", "https://api.openai.com/v1/images/generations", headers=headers, data=body, timeout=60)
-        if status == 200:
-            dalle_url = resp["data"][0]["url"]
-            if download_file(dalle_url, bg_path):
-                print("[Background] DALL-E 3 background ✓")
-                return bg_path
-
-    # Unsplash fallback
-    bg_url = "https://images.unsplash.com/photo-1557804506-669a67965ba0?w=1080&q=85"
-    if download_file(bg_url, bg_path):
-        print("[Background] Unsplash background fallback ✓")
-        return bg_path
-
-    return None
-
 # ═══════════════════════════════════════════════════════════════════════════════
-# ITEM 2 — VIDEO CREATION VIA FFMPEG
-# Creates a 15-second Reel:
-#   0-3s:   H&C logo intro card (solid navy, white text)
-#   3-12s:  Avatar image with animated text overlay (Ken Burns zoom)
-#   12-15s: CTA card (hcprelog.com)
+# STEP 4 — INSTAGRAM REEL POST
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def generate_reel_script(topic):
-    """Generate 3 text overlays for the reel using Claude."""
+def generate_reel_caption(topic, avatar_key):
+    """Short Instagram caption for the Reel."""
     if not ANTHROPIC_API_KEY:
-        return {
-            "intro": topic["hook"],
-            "main": f"{topic['title']}\nH&C PRECISE LOGISTICS LLC",
-            "cta": "Start at hcprelog.com\nFree GovCon Starter Academy",
-        }
+        return f"Watch to the end.\n\nH&C PRECISE LOGISTICS LLC — GovCon execution support.\nSDVOSB + HubZone certified.\nhcprelog.com\n\n#GovCon #SDVOSB #HubZone #FederalContracting #SmallBusiness #VeteranOwned #HCPreciseLogistics"
 
-    voice_desc = "Marcus Hale, direct GovCon expert" if topic["avatar"] == "marcus" else "Arielle Grant, business growth advisor"
-    system = (
-        "You write short, punchy video overlay text for Instagram Reels. "
-        "Each line is max 6 words. No punctuation except dashes. All caps for emphasis words only."
-    )
-    user = (
-        f"Write 3 text overlays for a 15-second Instagram Reel.\n"
-        f"Topic: {topic['title']}\n"
-        f"Hook: {topic['hook']}\n"
-        f"Voice: {voice_desc} for H&C PRECISE LOGISTICS LLC\n\n"
-        f"Return EXACTLY this JSON (no markdown, no extra text):\n"
-        f'{{"intro":"<3-6 word hook>","main":"<2 lines, 6 words each, newline separated>","cta":"<2 lines CTA>"}}'
-    )
-    headers = {"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"}
-    body = {"model": "claude-opus-4-5", "max_tokens": 256, "system": system, "messages": [{"role": "user", "content": user}]}
-    status, resp = http("POST", "https://api.anthropic.com/v1/messages", headers=headers, data=body, timeout=20)
-
-    if status == 200:
-        try:
-            text = resp["content"][0]["text"].strip()
-            # Extract JSON even if wrapped in markdown
-            import re
-            match = re.search(r'\{.*\}', text, re.DOTALL)
-            if match:
-                return json.loads(match.group())
-        except Exception as e:
-            print(f"[Script] JSON parse failed: {e}")
-
-    return {
-        "intro": topic["hook"][:40],
-        "main": f"{topic['title']}\nH&C PRECISE LOGISTICS LLC",
-        "cta": "Learn at hcprelog.com\nFree Starter Academy",
+    headers = {
+        "x-api-key": ANTHROPIC_API_KEY,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
     }
-
-def check_ffmpeg():
-    try:
-        result = subprocess.run(["ffmpeg", "-version"], capture_output=True, timeout=10)
-        if result.returncode == 0:
-            print("[FFmpeg] Available ✓")
-            return True
-    except Exception:
-        pass
-    print("[FFmpeg] Not found — installing...")
-    subprocess.run(["apt-get", "install", "-y", "ffmpeg"], capture_output=True)
-    try:
-        result = subprocess.run(["ffmpeg", "-version"], capture_output=True, timeout=10)
-        return result.returncode == 0
-    except Exception:
-        return False
-
-def create_reel_video(topic, avatar_path, bg_path, script, tmp_dir):
-    """
-    Assemble a 15-second Reel using FFmpeg.
-    Output: 1080x1920 MP4 (Instagram Reels format, 9:16).
-    """
-    output_path = os.path.join(tmp_dir, "reel.mp4")
-    avatar_overlay = os.path.join(tmp_dir, "avatar_padded.jpg")
-
-    # ── Sanitize text for FFmpeg drawtext (escape special chars) ─────────────
-    def esc(text):
-        return text.replace("'", "\\'").replace(":", "\\:").replace("\\", "\\\\")
-
-    intro_text = esc(script["intro"])
-    main_lines = script["main"].split("\n")
-    main_line1 = esc(main_lines[0]) if main_lines else ""
-    main_line2 = esc(main_lines[1]) if len(main_lines) > 1 else ""
-    cta_lines  = script["cta"].split("\n")
-    cta_line1  = esc(cta_lines[0]) if cta_lines else ""
-    cta_line2  = esc(cta_lines[1]) if len(cta_lines) > 1 else ""
-
-    # ── Build FFmpeg filter graph ─────────────────────────────────────────────
-    # Segment timing: intro 0-3s | main 3-12s | cta 12-15s
-    # Background: scale bg to 1080x1920, Ken Burns zoom
-    # Avatar: overlay at center during main segment
-    # Text: drawtext with fade in/out
-
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    font_regular = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
-
-    # Check if font exists, use fallback
-    if not os.path.exists(font_path):
-        font_path = "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"
-        font_regular = "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"
-    if not os.path.exists(font_path):
-        font_path = "DejaVuSans-Bold.ttf"
-        font_regular = "DejaVuSans.ttf"
-
-    filter_complex = (
-        # Input 0: background image → 1080x1920, 15 seconds, Ken Burns zoom
-        f"[0:v]scale=1920:1920,crop=1080:1920,setsar=1,"
-        f"zoompan=z='min(zoom+0.0005,1.05)':d={15*25}:s=1080x1920:fps=25[bg];"
-
-        # Input 1: avatar → scale to 600x600 with rounded feel
-        f"[1:v]scale=600:600,setsar=1[avatar];"
-
-        # ── Compose background with avatar overlay (3s to 12s) ──
-        f"[bg][avatar]overlay="
-        f"x=(W-w)/2:y=(H-h)/2-80:"
-        f"enable='between(t,3,12)'[comp];"
-
-        # ── Intro card (0-3s): dark overlay + intro text ──
-        f"[comp]drawbox=x=0:y=0:w=1080:h=1920:color=0x0C1F3F@0.85:t=fill:"
-        f"enable='lt(t,3)',"
-
-        # Intro text centered
-        f"drawtext=fontfile={font_path}:text='{intro_text}':"
-        f"fontcolor=white:fontsize=52:x=(w-text_w)/2:y=(h-text_h)/2:"
-        f"alpha='if(lt(t,0.5),t/0.5,if(gt(t,2.5),(3-t)/0.5,1))':"
-        f"enable='lt(t,3)',"
-
-        # HC brand watermark always visible
-        f"drawtext=fontfile={font_path}:text='H&C PRECISE LOGISTICS LLC':"
-        f"fontcolor=white@0.7:fontsize=26:x=(w-text_w)/2:y=h-80,"
-
-        # ── Main segment text (3s-12s) ──
-        f"drawtext=fontfile={font_path}:text='{main_line1}':"
-        f"fontcolor=white:fontsize=48:x=(w-text_w)/2:y=h-280:"
-        f"box=1:boxcolor=0x0C1F3F@0.75:boxborderw=12:"
-        f"alpha='if(lt(t,3.5),(t-3)/0.5,if(gt(t,11.5),(12-t)/0.5,1))':"
-        f"enable='between(t,3,12)',"
-
-        f"drawtext=fontfile={font_regular}:text='{main_line2}':"
-        f"fontcolor=white:fontsize=36:x=(w-text_w)/2:y=h-210:"
-        f"box=1:boxcolor=0x0C1F3F@0.75:boxborderw=10:"
-        f"alpha='if(lt(t,3.5),(t-3)/0.5,if(gt(t,11.5),(12-t)/0.5,1))':"
-        f"enable='between(t,3,12)',"
-
-        # ── CTA segment (12s-15s): navy overlay ──
-        f"drawbox=x=0:y=0:w=1080:h=1920:color=0x0C1F3F@0.90:t=fill:"
-        f"enable='gt(t,12)',"
-
-        f"drawtext=fontfile={font_path}:text='{cta_line1}':"
-        f"fontcolor=white:fontsize=54:x=(w-text_w)/2:y=(h-text_h)/2-40:"
-        f"alpha='if(lt(t,12.5),(t-12)/0.5,1)':"
-        f"enable='gt(t,12)',"
-
-        f"drawtext=fontfile={font_regular}:text='{cta_line2}':"
-        f"fontcolor={HC_GOLD}:fontsize=40:x=(w-text_w)/2:y=(h-text_h)/2+40:"
-        f"alpha='if(lt(t,12.5),(t-12)/0.5,1)':"
-        f"enable='gt(t,12)'"
-    )
-
-    cmd = [
-        "ffmpeg", "-y",
-        "-loop", "1", "-t", "15", "-i", bg_path,      # input 0: background
-        "-loop", "1", "-t", "15", "-i", avatar_path,  # input 1: avatar
-        "-filter_complex", filter_complex,
-        "-c:v", "libx264",
-        "-preset", "fast",
-        "-crf", "22",
-        "-pix_fmt", "yuv420p",
-        "-r", "25",
-        "-t", "15",
-        "-movflags", "+faststart",
-        output_path
-    ]
-
-    print("[FFmpeg] Rendering reel (this takes ~30s)...")
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-
-    if result.returncode != 0:
-        print(f"[FFmpeg] Error:\n{result.stderr[-2000:]}")
-        return None
-
-    size = Path(output_path).stat().st_size
-    print(f"[FFmpeg] Reel rendered: {size:,} bytes ({size/1024/1024:.1f} MB) ✓")
-    return output_path
+    body = {
+        "model": "claude-opus-4-5",
+        "max_tokens": 200,
+        "messages": [{"role": "user", "content": (
+            f"Write a short Instagram Reel caption (max 50 words + 10 hashtags) for H&C PRECISE LOGISTICS LLC.\n"
+            f"Topic: {topic['title']}\n"
+            f"End with: hcprelog.com\n"
+            f"Keep it punchy. Start with 'Watch to the end.' or a similar hook."
+        )}]
+    }
+    status, resp = http("POST", "https://api.anthropic.com/v1/messages", headers=headers, data=body, timeout=20)
+    if status == 200:
+        return resp["content"][0]["text"].strip()
+    return f"Watch to the end.\n\nhcprelog.com\n\n#GovCon #SDVOSB #HubZone #FederalContracting #HCPreciseLogistics"
 
 def ig_post_reel(video_url, caption):
-    """Post a Reel to Instagram via Graph API."""
+    """Post video as Instagram Reel via Graph API."""
     print(f"\n[Instagram] Creating Reel container...")
 
     params = urllib.parse.urlencode({
@@ -347,28 +334,32 @@ def ig_post_reel(video_url, caption):
         "share_to_feed": "true",
         "access_token": INSTAGRAM_ACCESS_TOKEN,
     })
-    url = f"{IG_API_BASE}/{INSTAGRAM_USER_ID}/media"
-    status, resp = http("POST", url, data=params.encode(),
-                        headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=30)
+    status, resp = http(
+        "POST",
+        f"{IG_API_BASE}/{INSTAGRAM_USER_ID}/media",
+        data=params.encode(),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        timeout=30,
+    )
 
     if status != 200 or "id" not in resp:
-        print(f"[Instagram] Reel container error {status}: {resp}")
+        print(f"[Instagram] Container error {status}: {resp}")
         return False
 
     container_id = resp["id"]
-    print(f"[Instagram] Reel container: {container_id} — waiting for processing...")
+    print(f"[Instagram] Container: {container_id} — processing...")
 
-    # Reels take longer to process (up to 2 min)
-    for attempt in range(24):
-        time.sleep(10)
+    # Poll until video is processed by Instagram (up to 4 min)
+    for attempt in range(30):
+        time.sleep(8)
         check_url = f"{IG_API_BASE}/{container_id}?fields=status_code,status&access_token={INSTAGRAM_ACCESS_TOKEN}"
         _, check = http("GET", check_url, timeout=15)
         status_code = check.get("status_code", "")
-        print(f"[Instagram] Status {attempt+1}/24: {status_code}")
+        print(f"[Instagram] Container status [{attempt+1}/30]: {status_code}")
         if status_code == "FINISHED":
             break
         if status_code == "ERROR":
-            print(f"[Instagram] Reel processing error: {check}")
+            print(f"[Instagram] Processing error: {check}")
             return False
 
     # Publish
@@ -376,9 +367,13 @@ def ig_post_reel(video_url, caption):
         "creation_id": container_id,
         "access_token": INSTAGRAM_ACCESS_TOKEN,
     })
-    pub_url = f"{IG_API_BASE}/{INSTAGRAM_USER_ID}/media_publish"
-    pub_status, pub_resp = http("POST", pub_url, data=pub_params.encode(),
-                                headers={"Content-Type": "application/x-www-form-urlencoded"}, timeout=30)
+    pub_status, pub_resp = http(
+        "POST",
+        f"{IG_API_BASE}/{INSTAGRAM_USER_ID}/media_publish",
+        data=pub_params.encode(),
+        headers={"Content-Type": "application/x-www-form-urlencoded"},
+        timeout=30,
+    )
 
     if pub_status == 200 and "id" in pub_resp:
         print(f"[Instagram] Reel published! Media ID: {pub_resp['id']} ✓")
@@ -387,98 +382,70 @@ def ig_post_reel(video_url, caption):
     print(f"[Instagram] Publish error {pub_status}: {pub_resp}")
     return False
 
-# ── Caption for the Reel (short, social) ─────────────────────────────────────
-def generate_reel_caption(topic):
-    if not ANTHROPIC_API_KEY:
-        return f"{topic['hook']}\n\n#GovCon #SDVOSB #HubZone #FederalContracting #HCPreciseLogistics\nhcprelog.com"
+# ═══════════════════════════════════════════════════════════════════════════════
+# MAIN
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    headers = {"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"}
-    body = {
-        "model": "claude-opus-4-5",
-        "max_tokens": 300,
-        "messages": [{
-            "role": "user",
-            "content": (
-                f"Write a short Instagram Reel caption (max 100 words) for H&C PRECISE LOGISTICS LLC.\n"
-                f"Topic: {topic['title']}\n"
-                f"Include 10 hashtags and end with: hcprelog.com\n"
-                f"Punchy, direct, no fluff."
-            )
-        }]
-    }
-    status, resp = http("POST", "https://api.anthropic.com/v1/messages", headers=headers, data=body, timeout=20)
-    if status == 200:
-        return resp["content"][0]["text"].strip()
-    return f"{topic['hook']}\n\n#GovCon #SDVOSB #HubZone #SmallBusiness #VeteranOwned #FederalContracting #HCPreciseLogistics\nhcprelog.com"
-
-# ── Main ──────────────────────────────────────────────────────────────────────
 def main():
     print("=" * 60)
-    print("H&C PRECISE LOGISTICS LLC — Instagram Reels Creator")
+    print("H&C PRECISE LOGISTICS LLC — Reels Creator (D-ID)")
     print(f"Run time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     print("=" * 60)
 
-    if not check_ffmpeg():
-        print("[FFmpeg] FATAL: FFmpeg not available")
-        sys.exit(1)
+    import tempfile, os
 
     # Pick topic by week number
     week = datetime.now(timezone.utc).isocalendar()[1]
     topic = REEL_TOPICS[week % len(REEL_TOPICS)]
-    print(f"[Topic] {topic['title']} (avatar: {topic['avatar']})")
+    avatar_key = topic["avatar"]
+    avatar_url = AVATAR_IMAGES[avatar_key]
+    print(f"[Topic] {topic['title']} | Avatar: {avatar_key}")
 
+    # Step 1: Generate script
+    script = generate_script(topic)
+
+    # Step 2: Create D-ID talking video
+    talk_id = create_did_talk(avatar_url, script, avatar_key)
+    if not talk_id:
+        print("FATAL: D-ID talk creation failed")
+        sys.exit(1)
+
+    video_url_did = poll_did_talk(talk_id)
+    if not video_url_did:
+        print("FATAL: D-ID video render failed or timed out")
+        sys.exit(1)
+
+    # Step 3: Download and upload to GitHub Pages
     with tempfile.TemporaryDirectory() as tmp_dir:
-        # Get avatar image
-        avatar_url = AVATAR_IMAGES[topic["avatar"]]
-        avatar_path = os.path.join(tmp_dir, "avatar.jpg")
+        tmp_video = os.path.join(tmp_dir, "reel.mp4")
 
-        if not download_file(avatar_url, avatar_path):
-            # Try fallback
-            fallback_url = AVATAR_FALLBACK[topic["avatar"]]
-            print(f"[Avatar] Repo image not found, using stock fallback")
-            if not download_file(fallback_url, avatar_path):
-                print("[Avatar] FATAL: could not download avatar image")
-                sys.exit(1)
-
-        # Get background image
-        bg_path = get_background_image(topic, tmp_dir)
-        if not bg_path:
-            print("[Background] FATAL: could not get background image")
+        if not download_video(video_url_did, tmp_video):
+            print("FATAL: could not download D-ID video")
             sys.exit(1)
 
-        # Generate script overlays
-        script = generate_reel_script(topic)
-        print(f"[Script] intro='{script['intro'][:40]}...' | cta='{script['cta'][:30]}...'")
-
-        # Render video
-        video_path = create_reel_video(topic, avatar_path, bg_path, script, tmp_dir)
-        if not video_path:
-            print("[Video] FATAL: FFmpeg render failed")
-            sys.exit(1)
-
-        # Upload to GitHub Pages
-        date_str = datetime.now(timezone.utc).strftime('%Y%m%d')
+        date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
         repo_path = f"videos/reel_{topic['id']}_{date_str}.mp4"
-        video_url = upload_to_pages(video_path, repo_path)
-        if not video_url:
-            print("[Upload] FATAL: could not upload video to GitHub Pages")
-            sys.exit(1)
+        public_url = upload_to_pages(tmp_video, repo_path)
 
-        # Wait for GitHub Pages CDN propagation (~30s)
-        print("[Wait] Waiting 40s for GitHub Pages to propagate video...")
-        time.sleep(40)
+    if not public_url:
+        # Fallback: try using D-ID URL directly
+        print("[Upload] GitHub Pages upload failed — trying D-ID URL directly")
+        public_url = video_url_did
 
-        # Generate caption
-        caption = generate_reel_caption(topic)
+    # Wait for GitHub Pages CDN propagation
+    if "github.io" in public_url:
+        print("[Wait] Waiting 45s for GitHub Pages CDN...")
+        time.sleep(45)
 
-        # Post to Instagram
-        success = ig_post_reel(video_url, caption)
+    # Step 4: Generate caption and post to Instagram
+    caption = generate_reel_caption(topic, avatar_key)
+    success = ig_post_reel(public_url, caption)
 
-        if success:
-            print(f"\n✓ Reel posted! Topic: {topic['id']}")
-        else:
-            print(f"\n✗ Reel posting failed")
-            sys.exit(1)
+    if success:
+        print(f"\n✓ Reel posted! Topic: {topic['id']} | Avatar: {avatar_key}")
+    else:
+        print(f"\n✗ Reel post failed")
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()
