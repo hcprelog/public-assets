@@ -164,20 +164,83 @@ def fallback_script(topic):
 # STEP 2 — D-ID TALKING AVATAR VIDEO
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def create_did_talk(avatar_url, script, avatar_key):
+def upload_avatar_to_did(avatar_url):
     """
-    Submit a talking video request to D-ID API.
-    Retries up to 3 times — D-ID's rekognition step can fail transiently.
+    Download avatar from GitHub and upload directly to D-ID CDN.
+    This avoids the rekognition moderation error caused by external URLs.
+    Returns the D-ID-hosted image URL.
+    """
+    import tempfile, os as _os
+
+    print(f"[D-ID] Downloading avatar for upload...")
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
+            tmp_path = tmp.name
+        urllib.request.urlretrieve(avatar_url, tmp_path)
+        size = _os.path.getsize(tmp_path)
+        print(f"[D-ID] Avatar downloaded: {size:,} bytes")
+    except Exception as e:
+        print(f"[D-ID] Avatar download failed: {e}")
+        return None
+
+    try:
+        with open(tmp_path, "rb") as f:
+            img_data = f.read()
+
+        boundary = f"FormBoundary{int(time.time())}"
+        body = (
+            f"--{boundary}\r\n"
+            f'Content-Disposition: form-data; name="image"; filename="avatar.png"\r\n'
+            f"Content-Type: image/png\r\n\r\n"
+        ).encode() + img_data + f"\r\n--{boundary}--\r\n".encode()
+
+        encoded = base64.b64encode(f"{D_ID_API_KEY}:".encode()).decode()
+        headers = {
+            "Authorization": f"Basic {encoded}",
+            "Content-Type": f"multipart/form-data; boundary={boundary}",
+        }
+
+        req = urllib.request.Request(
+            f"{D_ID_API_BASE}/images",
+            data=body,
+            headers=headers,
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=30) as r:
+            resp = json.loads(r.read().decode())
+            did_url = resp.get("url")
+            if did_url:
+                print(f"[D-ID] Avatar uploaded to D-ID CDN: {did_url[:60]}... ✓")
+                return did_url
+            print(f"[D-ID] Upload response missing URL: {resp}")
+            return None
+
+    except urllib.error.HTTPError as e:
+        body_txt = e.read().decode()
+        print(f"[D-ID] Image upload error {e.code}: {body_txt[:300]}")
+        return None
+    except Exception as e:
+        print(f"[D-ID] Image upload failed: {e}")
+        return None
+    finally:
+        try:
+            _os.unlink(tmp_path)
+        except Exception:
+            pass
+
+def create_did_talk(source_url, script, avatar_key):
+    """
+    Submit a talking video request to D-ID API using a D-ID-hosted image URL.
     Returns the talk ID for polling.
     """
-    print(f"\n[D-ID] Creating talk for avatar: {avatar_key}")
-    print(f"[D-ID] Image URL: {avatar_url}")
-    print(f"[D-ID] Script preview: {script[:80]}...")
+    print(f"\n[D-ID] Creating talk — avatar: {avatar_key}")
+    print(f"[D-ID] Source: {source_url[:70]}...")
+    print(f"[D-ID] Script: {script[:80]}...")
 
     voice = AVATAR_VOICES.get(avatar_key, AVATAR_VOICES["arielle"])
 
     body = {
-        "source_url": avatar_url,
+        "source_url": source_url,
         "script": {
             "type": "text",
             "input": script,
@@ -193,31 +256,23 @@ def create_did_talk(avatar_url, script, avatar_key):
         },
     }
 
-    for attempt in range(1, 4):  # 3 attempts
-        print(f"[D-ID] Attempt {attempt}/3...")
-        status, resp = http("POST", f"{D_ID_API_BASE}/talks", headers=d_id_headers(), data=body, timeout=30)
+    status, resp = http("POST", f"{D_ID_API_BASE}/talks", headers=d_id_headers(), data=body, timeout=30)
 
-        if status in (200, 201) and "id" in resp:
-            talk_id = resp["id"]
-            print(f"[D-ID] Talk created: {talk_id} ✓")
-            return talk_id
+    if status in (200, 201) and "id" in resp:
+        talk_id = resp["id"]
+        print(f"[D-ID] Talk created: {talk_id} ✓")
+        return talk_id
 
-        error_msg = str(resp)
-        print(f"[D-ID] Attempt {attempt} error {status}: {error_msg[:200]}")
+    error_msg = str(resp)
+    print(f"[D-ID] Creation error {status}: {error_msg[:300]}")
 
-        if status == 401:
-            print("[D-ID] Auth failed — check D_ID_API_KEY secret")
-            return None
-        if "credits" in error_msg.lower() or "quota" in error_msg.lower():
-            print("[D-ID] Out of credits — add credits at studio.d-id.com/settings")
-            return None
-        if "rekognition" in error_msg.lower() or status == 500:
-            print(f"[D-ID] AWS Rekognition transient error — waiting 15s before retry...")
-            if attempt < 3:
-                time.sleep(15)
-            continue
+    if status == 401:
+        print("[D-ID] Auth failed — check D_ID_API_KEY secret")
+    elif "credits" in error_msg.lower() or "quota" in error_msg.lower():
+        print("[D-ID] Out of credits — add at studio.d-id.com/settings")
+    elif status == 402:
+        print("[D-ID] Payment required — free trial exhausted, upgrade to Lite ($5.99/mo)")
 
-    print("[D-ID] All 3 attempts failed")
     return None
 
 def poll_did_talk(talk_id, max_wait=180):
@@ -414,8 +469,14 @@ def main():
     # Step 1: Generate script
     script = generate_script(topic)
 
-    # Step 2: Create D-ID talking video
-    talk_id = create_did_talk(avatar_url, script, avatar_key)
+    # Step 2: Pre-upload avatar to D-ID CDN (avoids rekognition external URL errors)
+    did_image_url = upload_avatar_to_did(avatar_url)
+    if not did_image_url:
+        print("FATAL: could not upload avatar to D-ID")
+        sys.exit(1)
+
+    # Step 3: Create D-ID talking video
+    talk_id = create_did_talk(did_image_url, script, avatar_key)
     if not talk_id:
         print("FATAL: D-ID talk creation failed")
         sys.exit(1)
@@ -425,7 +486,7 @@ def main():
         print("FATAL: D-ID video render failed or timed out")
         sys.exit(1)
 
-    # Step 3: Download and upload to GitHub Pages
+    # Step 4: Download and upload to GitHub Pages
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_video = os.path.join(tmp_dir, "reel.mp4")
 
@@ -447,7 +508,7 @@ def main():
         print("[Wait] Waiting 45s for GitHub Pages CDN...")
         time.sleep(45)
 
-    # Step 4: Generate caption and post to Instagram
+    # Step 5: Generate caption and post to Instagram
     caption = generate_reel_caption(topic, avatar_key)
     success = ig_post_reel(public_url, caption)
 
