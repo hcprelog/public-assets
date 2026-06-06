@@ -189,7 +189,7 @@ def generate_audio_elevenlabs(script, avatar_key):
     url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
     body = json.dumps({
         "text": script,
-        "model_id": "eleven_monolingual_v1",
+        "model_id": "eleven_turbo_v2_5",
         "voice_settings": {
             "stability": 0.5,
             "similarity_boost": 0.75,
