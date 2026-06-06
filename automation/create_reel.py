@@ -246,9 +246,16 @@ def upload_to_github(source, repo_path, is_bytes=False):
 # STEP 4 — REPLICATE SADTALKER VIDEO
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def _replicate_headers():
+    return {
+        "Authorization": f"Bearer {REPLICATE_API_TOKEN}",
+        "Content-Type": "application/json",
+        "User-Agent": "HCPreciseLogistics-ReelBot/1.0",
+    }
+
 def get_sadtalker_version():
     """Fetch the latest SadTalker version ID from Replicate."""
-    headers = {"Authorization": f"Token {REPLICATE_API_TOKEN}"}
+    headers = _replicate_headers()
     status, resp = http(
         "GET",
         "https://api.replicate.com/v1/models/cjwbw/sadtalker/versions",
@@ -268,10 +275,6 @@ def create_sadtalker_prediction(avatar_url, audio_url, version):
     print(f"[Replicate] Avatar: {avatar_url[:70]}...")
     print(f"[Replicate] Audio:  {audio_url[:70]}...")
 
-    headers = {
-        "Authorization": f"Token {REPLICATE_API_TOKEN}",
-        "Content-Type": "application/json",
-    }
     body = {
         "version": version,
         "input": {
@@ -287,7 +290,7 @@ def create_sadtalker_prediction(avatar_url, audio_url, version):
 
     status, resp = http(
         "POST", "https://api.replicate.com/v1/predictions",
-        headers=headers, data=body, timeout=30,
+        headers=_replicate_headers(), data=body, timeout=30,
     )
     if status in (200, 201):
         pred_id = resp["id"]
@@ -300,7 +303,6 @@ def create_sadtalker_prediction(avatar_url, audio_url, version):
 def poll_sadtalker(pred_id, max_wait=600):
     """Poll Replicate until video is ready. SadTalker typically takes 3-8 min."""
     print(f"[Replicate] Waiting for render (up to {max_wait//60} min)...")
-    headers = {"Authorization": f"Token {REPLICATE_API_TOKEN}"}
     start = time.time()
     attempt = 0
 
@@ -309,7 +311,7 @@ def poll_sadtalker(pred_id, max_wait=600):
         attempt += 1
         status, resp = http(
             "GET", f"https://api.replicate.com/v1/predictions/{pred_id}",
-            headers=headers, timeout=15,
+            headers=_replicate_headers(), timeout=15,
         )
 
         if status != 200:
