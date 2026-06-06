@@ -29,7 +29,7 @@ INSTAGRAM_USER_ID      = os.environ["INSTAGRAM_USER_ID"]
 INSTAGRAM_ACCESS_TOKEN = os.environ["INSTAGRAM_ACCESS_TOKEN"]
 ANTHROPIC_API_KEY      = os.environ.get("ANTHROPIC_API_KEY", "")
 REPLICATE_API_TOKEN    = os.environ["REPLICATE_API_TOKEN"]
-ELEVENLABS_API_KEY     = os.environ.get("ELEVENLABS_API_KEY", "")
+OPENAI_API_KEY         = os.environ.get("OPENAI_API_KEY", "")
 GITHUB_TOKEN           = os.environ["GITHUB_TOKEN"]
 GITHUB_REPO            = os.environ.get("GITHUB_REPOSITORY", "hcprelog/public-assets")
 
@@ -41,13 +41,13 @@ AVATAR_IMAGES = {
     "arielle": "https://raw.githubusercontent.com/hcprelog/public-assets/main/avatars/Arielle%20Grant.png",
 }
 
-# ElevenLabs voice IDs (primary — natural, human-quality)
-ELEVENLABS_VOICES = {
-    "marcus":  "pNInz6obpgDQGcFmaJgB",  # Adam — deep, authoritative American male
-    "arielle": "21m00Tcm4TlvDq8ikWAM",  # Rachel — warm, clear American female
+# OpenAI TTS voices (primary — human-quality, natural)
+OPENAI_VOICES = {
+    "marcus":  "onyx",   # deep, authoritative American male
+    "arielle": "nova",   # warm, natural American female
 }
 
-# edge-tts fallback voices (Microsoft Neural TTS — free, used if ElevenLabs fails)
+# edge-tts fallback voices (Microsoft Neural TTS — free, used if OpenAI fails)
 EDGETTS_VOICES = {
     "marcus":  "en-US-ChristopherNeural",
     "arielle": "en-US-AriaNeural",
@@ -197,45 +197,39 @@ def fallback_script(topic):
     )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 2 — AUDIO GENERATION (ElevenLabs primary, edge-tts fallback)
+# STEP 2 — AUDIO GENERATION (OpenAI TTS primary, edge-tts fallback)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def generate_audio_elevenlabs(script, avatar_key):
-    """Generate MP3 audio via ElevenLabs (natural human-quality voice)."""
-    voice_id   = ELEVENLABS_VOICES.get(avatar_key, ELEVENLABS_VOICES["arielle"])
-    voice_name = "Adam" if avatar_key == "marcus" else "Rachel"
-    print(f"\n[ElevenLabs] Generating audio — avatar: {avatar_key}, voice: {voice_name}")
+def generate_audio_openai(script, avatar_key):
+    """Generate MP3 audio via OpenAI TTS — natural, human-quality voice."""
+    voice = OPENAI_VOICES.get(avatar_key, OPENAI_VOICES["arielle"])
+    print(f"\n[OpenAI TTS] Generating audio — avatar: {avatar_key}, voice: {voice}")
 
     headers = {
-        "xi-api-key":   ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
-        "Accept":       "audio/mpeg",
-        "User-Agent":   "HCPreciseLogistics-ReelBot/1.0",
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type":  "application/json",
+        "User-Agent":    "HCPreciseLogistics-ReelBot/1.0",
     }
     body = {
-        "text": script,
-        "model_id": "eleven_turbo_v2_5",
-        "voice_settings": {
-            "stability":        0.45,
-            "similarity_boost": 0.80,
-            "style":            0.35,
-            "use_speaker_boost": True,
-        },
+        "model":           "tts-1-hd",
+        "input":           script,
+        "voice":           voice,
+        "response_format": "mp3",
     }
     status, audio_bytes = http_binary(
         "POST",
-        f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
+        "https://api.openai.com/v1/audio/speech",
         headers=headers,
         data=body,
         timeout=30,
     )
     if status == 200 and len(audio_bytes) > 1000:
-        print(f"[ElevenLabs] Audio generated: {len(audio_bytes):,} bytes ✓")
+        print(f"[OpenAI TTS] Audio generated: {len(audio_bytes):,} bytes ✓")
         return audio_bytes
 
     err = audio_bytes.decode(errors="replace")[:200]
-    print(f"[ElevenLabs] Error {status}: {err}")
-    print("[ElevenLabs] → Falling back to edge-tts...")
+    print(f"[OpenAI TTS] Error {status}: {err}")
+    print("[OpenAI TTS] → Falling back to edge-tts...")
     return generate_audio_edge_tts(script, avatar_key)
 
 def generate_audio_edge_tts(script, avatar_key):
@@ -531,10 +525,10 @@ def main():
     # Step 1: Generate script
     script = generate_script(topic)
 
-    # Step 2: Generate audio — ElevenLabs primary, edge-tts fallback
-    audio_bytes = generate_audio_elevenlabs(script, avatar_key)
+    # Step 2: Generate audio — OpenAI TTS primary, edge-tts fallback
+    audio_bytes = generate_audio_openai(script, avatar_key)
     if not audio_bytes:
-        print("FATAL: audio generation failed (both ElevenLabs and edge-tts)")
+        print("FATAL: audio generation failed (both OpenAI TTS and edge-tts)")
         sys.exit(1)
 
     # Step 3: Upload audio to GitHub — use raw URL (no CDN wait, immediate access)
