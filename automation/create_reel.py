@@ -1,17 +1,17 @@
 """
-H&C PRECISE LOGISTICS LLC — Instagram Reels Creator (ElevenLabs + Replicate SadTalker)
+H&C PRECISE LOGISTICS LLC — Instagram Reels Creator (edge-tts + Replicate SadTalker)
 Runs weekly (Wednesdays 10AM ET) via instagram-reel.yml
 
 Pipeline:
 1. Pick a weekly Reel topic (Marcus or Arielle)
 2. Generate 30-45 second talking script via Claude
-3. Generate audio via ElevenLabs TTS (free tier, 10K chars/month)
+3. Generate audio via edge-tts (Microsoft Neural TTS — free, no API key, no IP blocks)
 4. Upload audio to GitHub repo → raw URL (immediate, no CDN wait)
 5. Send avatar image + audio to Replicate SadTalker → talking head MP4 (~$0.50/video)
 6. Download MP4, upload to GitHub Pages → public URL
 7. Post as Instagram Reel via Graph API
 
-Cost: ~$0.50/video (Replicate only — ElevenLabs free). No watermarks.
+Cost: ~$0.50/video (Replicate only — TTS is free). No watermarks.
 """
 
 import os
@@ -28,7 +28,6 @@ from datetime import datetime, timezone
 INSTAGRAM_USER_ID      = os.environ["INSTAGRAM_USER_ID"]
 INSTAGRAM_ACCESS_TOKEN = os.environ["INSTAGRAM_ACCESS_TOKEN"]
 ANTHROPIC_API_KEY      = os.environ.get("ANTHROPIC_API_KEY", "")
-ELEVENLABS_API_KEY     = os.environ["ELEVENLABS_API_KEY"]
 REPLICATE_API_TOKEN    = os.environ["REPLICATE_API_TOKEN"]
 GITHUB_TOKEN           = os.environ["GITHUB_TOKEN"]
 GITHUB_REPO            = os.environ.get("GITHUB_REPOSITORY", "hcprelog/public-assets")
@@ -41,10 +40,10 @@ AVATAR_IMAGES = {
     "arielle": "https://raw.githubusercontent.com/hcprelog/public-assets/main/avatars/Arielle%20Grant.png",
 }
 
-# ElevenLabs pre-made voice IDs (free tier, no subscription required)
+# Microsoft Neural TTS voices via edge-tts (free, no API key)
 AVATAR_VOICES = {
-    "marcus":  "pNInz6obpgDQGcFmaJgB",  # Adam — deep, authoritative male
-    "arielle": "21m00Tcm4TlvDq8ikWAM",  # Rachel — warm, clear female
+    "marcus":  "en-US-ChristopherNeural",  # deep, authoritative male
+    "arielle": "en-US-AriaNeural",         # warm, clear female
 }
 
 # Acronym expansion — TTS will mispronounce these if left as-is
@@ -178,40 +177,32 @@ def fallback_script(topic):
     )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 2 — ELEVENLABS TTS AUDIO
+# STEP 2 — EDGE-TTS AUDIO (Microsoft Neural TTS — free, no API key)
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def generate_audio_elevenlabs(script, avatar_key):
-    """Generate MP3 audio from script using ElevenLabs TTS (free tier)."""
-    voice_id = AVATAR_VOICES.get(avatar_key, AVATAR_VOICES["arielle"])
-    print(f"\n[ElevenLabs] Generating audio — avatar: {avatar_key}, voice: {voice_id[:8]}...")
+def generate_audio_edge_tts(script, avatar_key):
+    """Generate MP3 audio via edge-tts (Microsoft Neural TTS). Free, no API key."""
+    import asyncio
+    import edge_tts
+    import tempfile
 
-    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-    body = json.dumps({
-        "text": script,
-        "model_id": "eleven_turbo_v2_5",
-        "voice_settings": {
-            "stability": 0.5,
-            "similarity_boost": 0.75,
-        }
-    }).encode()
+    voice = AVATAR_VOICES.get(avatar_key, AVATAR_VOICES["arielle"])
+    print(f"\n[edge-tts] Generating audio — avatar: {avatar_key}, voice: {voice}")
 
-    headers = {
-        "xi-api-key": ELEVENLABS_API_KEY,
-        "Content-Type": "application/json",
-        "Accept": "audio/mpeg",
-    }
+    tmp_path = tempfile.mktemp(suffix=".mp3")
 
-    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            audio_bytes = r.read()
-            print(f"[ElevenLabs] Audio generated: {len(audio_bytes):,} bytes ✓")
-            return audio_bytes
-    except urllib.error.HTTPError as e:
-        err = e.read().decode()
-        print(f"[ElevenLabs] Error {e.code}: {err[:300]}")
-        return None
+    async def _synthesize():
+        communicate = edge_tts.Communicate(script, voice)
+        await communicate.save(tmp_path)
+
+    asyncio.run(_synthesize())
+
+    with open(tmp_path, "rb") as f:
+        audio_bytes = f.read()
+    os.unlink(tmp_path)
+
+    print(f"[edge-tts] Audio generated: {len(audio_bytes):,} bytes ✓")
+    return audio_bytes
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 3 — GITHUB UPLOAD (audio temp file + final video)
@@ -480,10 +471,10 @@ def main():
     # Step 1: Generate script
     script = generate_script(topic)
 
-    # Step 2: Generate audio via ElevenLabs TTS
-    audio_bytes = generate_audio_elevenlabs(script, avatar_key)
+    # Step 2: Generate audio via edge-tts (Microsoft Neural TTS)
+    audio_bytes = generate_audio_edge_tts(script, avatar_key)
     if not audio_bytes:
-        print("FATAL: ElevenLabs audio generation failed")
+        print("FATAL: edge-tts audio generation failed")
         sys.exit(1)
 
     # Step 3: Upload audio to GitHub — use raw URL (no CDN wait, immediate access)
