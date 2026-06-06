@@ -1,18 +1,17 @@
 """
-H&C PRECISE LOGISTICS LLC — Instagram Reels Creator (D-ID Talking Avatar)
+H&C PRECISE LOGISTICS LLC — Instagram Reels Creator (ElevenLabs + Replicate SadTalker)
 Runs weekly (Wednesdays 10AM ET) via instagram-reel.yml
 
 Pipeline:
 1. Pick a weekly Reel topic (Marcus or Arielle)
 2. Generate 30-45 second talking script via Claude
-3. Send avatar image + script to D-ID API → talking head MP4
-4. Upload video to GitHub Pages for public URL
-5. Post as Instagram Reel via Graph API
+3. Generate audio via ElevenLabs TTS (free tier, 10K chars/month)
+4. Upload audio to GitHub repo → raw URL (immediate, no CDN wait)
+5. Send avatar image + audio to Replicate SadTalker → talking head MP4 (~$0.50/video)
+6. Download MP4, upload to GitHub Pages → public URL
+7. Post as Instagram Reel via Graph API
 
-D-ID Lite plan: $5.99/month = 10 min of video
-At 1 video/week (45s) = ~3 min/month — well within Lite tier
-Free trial: 20 credits (~5 min) covers initial testing
-Sign up + API key: https://studio.d-id.com
+Cost: ~$0.50/video (Replicate only — ElevenLabs free). No watermarks.
 """
 
 import os
@@ -29,40 +28,37 @@ from datetime import datetime, timezone
 INSTAGRAM_USER_ID      = os.environ["INSTAGRAM_USER_ID"]
 INSTAGRAM_ACCESS_TOKEN = os.environ["INSTAGRAM_ACCESS_TOKEN"]
 ANTHROPIC_API_KEY      = os.environ.get("ANTHROPIC_API_KEY", "")
-D_ID_API_KEY           = os.environ["D_ID_API_KEY"]
+ELEVENLABS_API_KEY     = os.environ["ELEVENLABS_API_KEY"]
+REPLICATE_API_TOKEN    = os.environ["REPLICATE_API_TOKEN"]
 GITHUB_TOKEN           = os.environ["GITHUB_TOKEN"]
 GITHUB_REPO            = os.environ.get("GITHUB_REPOSITORY", "hcprelog/public-assets")
 
-IG_API_BASE  = "https://graph.facebook.com/v25.0"
-D_ID_API_BASE = "https://api.d-id.com"
+IG_API_BASE = "https://graph.facebook.com/v25.0"
 
 # ── Brand avatars ─────────────────────────────────────────────────────────────
-# Using raw.githubusercontent.com — served directly, no CDN delay, no Pages propagation
 AVATAR_IMAGES = {
     "marcus":  "https://raw.githubusercontent.com/hcprelog/public-assets/main/avatars/Marcus%20Hale.png",
     "arielle": "https://raw.githubusercontent.com/hcprelog/public-assets/main/avatars/Arielle%20Grant.png",
 }
 
-# Microsoft Neural TTS voices via D-ID
-# Marcus: ChristopherNeural — deep, authoritative, professional male
-# Arielle: AriaNeural — clear, warm, professional female
+# ElevenLabs pre-made voice IDs (free tier, no subscription required)
 AVATAR_VOICES = {
-    "marcus":  {"type": "microsoft", "voice_id": "en-US-ChristopherNeural"},
-    "arielle": {"type": "microsoft", "voice_id": "en-US-AriaNeural"},
+    "marcus":  "pNInz6obpgDQGcFmaJgB",  # Adam — deep, authoritative male
+    "arielle": "21m00Tcm4TlvDq8ikWAM",  # Rachel — warm, clear female
 }
 
-# Acronym expansion — D-ID TTS will mispronounce these if left as-is
+# Acronym expansion — TTS will mispronounce these if left as-is
 ACRONYM_MAP = {
-    "SDVOSB":   "Service-Disabled Veteran-Owned Small Business",
-    "HubZone":  "Hub Zone",
-    "GovCon":   "government contracting",
-    "SAM.gov":  "SAM dot gov",
-    "DoD":      "Department of Defense",
-    "NAICS":    "NAY-icks",
-    "RFP":      "Request for Proposal",
-    "PWS":      "Performance Work Statement",
-    "SBA":      "Small Business Administration",
-    "CTA":      "call to action",
+    "SDVOSB":       "Service-Disabled Veteran-Owned Small Business",
+    "HubZone":      "Hub Zone",
+    "GovCon":       "government contracting",
+    "SAM.gov":      "SAM dot gov",
+    "DoD":          "Department of Defense",
+    "NAICS":        "NAY-icks",
+    "RFP":          "Request for Proposal",
+    "PWS":          "Performance Work Statement",
+    "SBA":          "Small Business Administration",
+    "CTA":          "call to action",
     "hcprelog.com": "H C prelog dot com",
 }
 
@@ -109,36 +105,18 @@ def http(method, url, headers=None, data=None, timeout=60):
         except Exception:
             return e.code, {"error": body}
 
-def d_id_headers():
-    """D-ID Basic auth: base64(api_key:)"""
-    encoded = base64.b64encode(f"{D_ID_API_KEY}:".encode()).decode()
-    return {
-        "Authorization": f"Basic {encoded}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 1 — SCRIPT GENERATION
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def preprocess_script(script):
-    """
-    Replace acronyms and technical shorthand with their full spoken forms
-    so D-ID TTS pronounces everything correctly and naturally.
-    """
     import re
     result = script
     for acronym, expansion in ACRONYM_MAP.items():
-        # Word-boundary match, case-sensitive for acronyms
         result = re.sub(rf'\b{re.escape(acronym)}\b', expansion, result)
     return result
 
 def generate_script(topic):
-    """
-    Generate a 30-45 second speaking script (~75-100 words).
-    Structured as: hook → 2-3 insights → CTA
-    """
     if not ANTHROPIC_API_KEY:
         return preprocess_script(fallback_script(topic))
 
@@ -182,7 +160,7 @@ def generate_script(topic):
     status, resp = http("POST", "https://api.anthropic.com/v1/messages", headers=headers, data=body, timeout=30)
     if status == 200:
         script = resp["content"][0]["text"].strip()
-        script = preprocess_script(script)  # catch any acronyms that slipped through
+        script = preprocess_script(script)
         word_count = len(script.split())
         print(f"[Script] Generated: {word_count} words (~{word_count//2}s speaking time)")
         print(f"[Script] Preview: {script[:120]}...")
@@ -195,166 +173,180 @@ def fallback_script(topic):
         f"If you're serious about government contracting, here's what most people miss about {topic['title'].lower()}. "
         f"At H&C PRECISE LOGISTICS LLC, we help businesses navigate every step — "
         f"from registration to your first awarded contract. "
-        f"SDVOSB and HubZone certified. Based in Durham, North Carolina. "
-        f"Start at hcprelog.com — the free GovCon Starter Academy is waiting for you."
+        f"Service-Disabled Veteran-Owned Small Business and Hub Zone certified. Based in Durham, North Carolina. "
+        f"Start at H C prelog dot com — the free Starter Academy is waiting for you."
     )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 2 — D-ID TALKING AVATAR VIDEO
+# STEP 2 — ELEVENLABS TTS AUDIO
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def upload_avatar_to_did(avatar_url):
-    """
-    Download avatar from GitHub and upload directly to D-ID CDN.
-    This avoids the rekognition moderation error caused by external URLs.
-    Returns the D-ID-hosted image URL.
-    """
-    import tempfile, os as _os
+def generate_audio_elevenlabs(script, avatar_key):
+    """Generate MP3 audio from script using ElevenLabs TTS (free tier)."""
+    voice_id = AVATAR_VOICES.get(avatar_key, AVATAR_VOICES["arielle"])
+    print(f"\n[ElevenLabs] Generating audio — avatar: {avatar_key}, voice: {voice_id[:8]}...")
 
-    print(f"[D-ID] Downloading avatar for upload...")
-    try:
-        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp:
-            tmp_path = tmp.name
-        urllib.request.urlretrieve(avatar_url, tmp_path)
-        size = _os.path.getsize(tmp_path)
-        print(f"[D-ID] Avatar downloaded: {size:,} bytes")
-    except Exception as e:
-        print(f"[D-ID] Avatar download failed: {e}")
-        return None
-
-    try:
-        with open(tmp_path, "rb") as f:
-            img_data = f.read()
-
-        boundary = f"FormBoundary{int(time.time())}"
-        body = (
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="image"; filename="avatar.png"\r\n'
-            f"Content-Type: image/png\r\n\r\n"
-        ).encode() + img_data + f"\r\n--{boundary}--\r\n".encode()
-
-        encoded = base64.b64encode(f"{D_ID_API_KEY}:".encode()).decode()
-        headers = {
-            "Authorization": f"Basic {encoded}",
-            "Content-Type": f"multipart/form-data; boundary={boundary}",
+    url = f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+    body = json.dumps({
+        "text": script,
+        "model_id": "eleven_monolingual_v1",
+        "voice_settings": {
+            "stability": 0.5,
+            "similarity_boost": 0.75,
         }
+    }).encode()
 
-        req = urllib.request.Request(
-            f"{D_ID_API_BASE}/images",
-            data=body,
-            headers=headers,
-            method="POST",
-        )
+    headers = {
+        "xi-api-key": ELEVENLABS_API_KEY,
+        "Content-Type": "application/json",
+        "Accept": "audio/mpeg",
+    }
+
+    req = urllib.request.Request(url, data=body, headers=headers, method="POST")
+    try:
         with urllib.request.urlopen(req, timeout=30) as r:
-            resp = json.loads(r.read().decode())
-            did_url = resp.get("url")
-            if did_url:
-                print(f"[D-ID] Avatar uploaded to D-ID CDN: {did_url[:60]}... ✓")
-                return did_url
-            print(f"[D-ID] Upload response missing URL: {resp}")
-            return None
-
+            audio_bytes = r.read()
+            print(f"[ElevenLabs] Audio generated: {len(audio_bytes):,} bytes ✓")
+            return audio_bytes
     except urllib.error.HTTPError as e:
-        body_txt = e.read().decode()
-        print(f"[D-ID] Image upload error {e.code}: {body_txt[:300]}")
+        err = e.read().decode()
+        print(f"[ElevenLabs] Error {e.code}: {err[:300]}")
         return None
-    except Exception as e:
-        print(f"[D-ID] Image upload failed: {e}")
-        return None
-    finally:
-        try:
-            _os.unlink(tmp_path)
-        except Exception:
-            pass
 
-def create_did_talk(source_url, script, avatar_key):
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 3 — GITHUB UPLOAD (audio temp file + final video)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def upload_to_github(source, repo_path, is_bytes=False):
     """
-    Submit a talking video request to D-ID API using a D-ID-hosted image URL.
-    Returns the talk ID for polling.
+    Upload bytes or a local file to the GitHub repo.
+    Returns (raw_githubusercontent_url, github_pages_url).
+    raw URL is immediately accessible; pages URL needs ~45s CDN propagation.
     """
-    print(f"\n[D-ID] Creating talk — avatar: {avatar_key}")
-    print(f"[D-ID] Source: {source_url[:70]}...")
-    print(f"[D-ID] Script: {script[:80]}...")
+    raw = source if is_bytes else open(source, "rb").read()
+    encoded = base64.b64encode(raw).decode()
+    gh_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{repo_path}"
+    headers = {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github.v3+json",
+    }
 
-    voice = AVATAR_VOICES.get(avatar_key, AVATAR_VOICES["arielle"])
+    status, existing = http("GET", gh_url, headers=headers, timeout=15)
+    sha = existing.get("sha") if status == 200 else None
 
+    body = {"message": f"auto: reel {repo_path}", "content": encoded}
+    if sha:
+        body["sha"] = sha
+
+    size_mb = len(raw) / 1024 / 1024
+    print(f"[Upload] Uploading {repo_path} ({size_mb:.1f} MB)...")
+    status, resp = http("PUT", gh_url, headers=headers, data=body, timeout=120)
+
+    if status in (200, 201):
+        raw_url   = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{repo_path}"
+        pages_url = f"https://hcprelog.github.io/public-assets/{repo_path}"
+        print(f"[Upload] ✓ {raw_url[:70]}...")
+        return raw_url, pages_url
+
+    print(f"[Upload] Failed {status}: {resp}")
+    return None, None
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 4 — REPLICATE SADTALKER VIDEO
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_sadtalker_version():
+    """Fetch the latest SadTalker version ID from Replicate."""
+    headers = {"Authorization": f"Token {REPLICATE_API_TOKEN}"}
+    status, resp = http(
+        "GET",
+        "https://api.replicate.com/v1/models/cjwbw/sadtalker/versions",
+        headers=headers,
+        timeout=15,
+    )
+    if status == 200 and resp.get("results"):
+        version = resp["results"][0]["id"]
+        print(f"[Replicate] SadTalker version: {version[:16]}...")
+        return version
+    print(f"[Replicate] Could not fetch version: {status} {resp}")
+    return None
+
+def create_sadtalker_prediction(avatar_url, audio_url, version):
+    """Submit a SadTalker prediction. Returns prediction ID."""
+    print(f"\n[Replicate] Submitting SadTalker prediction...")
+    print(f"[Replicate] Avatar: {avatar_url[:70]}...")
+    print(f"[Replicate] Audio:  {audio_url[:70]}...")
+
+    headers = {
+        "Authorization": f"Token {REPLICATE_API_TOKEN}",
+        "Content-Type": "application/json",
+    }
     body = {
-        "source_url": source_url,
-        "script": {
-            "type": "text",
-            "input": script,
-            "provider": {
-                "type": voice["type"],
-                "voice_id": voice["voice_id"],
-            },
-        },
-        "config": {
-            "fluent": True,
-            "pad_audio": 0.0,
-            "stitch": True,
+        "version": version,
+        "input": {
+            "source_image":     avatar_url,
+            "driven_audio":     audio_url,
+            "preprocess":       "crop",
+            "still_mode":       True,
+            "use_enhancer":     False,
+            "size_of_image":    256,
+            "expression_scale": 1.0,
         },
     }
 
-    status, resp = http("POST", f"{D_ID_API_BASE}/talks", headers=d_id_headers(), data=body, timeout=30)
+    status, resp = http(
+        "POST", "https://api.replicate.com/v1/predictions",
+        headers=headers, data=body, timeout=30,
+    )
+    if status in (200, 201):
+        pred_id = resp["id"]
+        print(f"[Replicate] Prediction created: {pred_id} ✓")
+        return pred_id
 
-    if status in (200, 201) and "id" in resp:
-        talk_id = resp["id"]
-        print(f"[D-ID] Talk created: {talk_id} ✓")
-        return talk_id
-
-    error_msg = str(resp)
-    print(f"[D-ID] Creation error {status}: {error_msg[:300]}")
-
-    if status == 401:
-        print("[D-ID] Auth failed — check D_ID_API_KEY secret")
-    elif "credits" in error_msg.lower() or "quota" in error_msg.lower():
-        print("[D-ID] Out of credits — add at studio.d-id.com/settings")
-    elif status == 402:
-        print("[D-ID] Payment required — free trial exhausted, upgrade to Lite ($5.99/mo)")
-
+    print(f"[Replicate] Submission failed {status}: {resp}")
     return None
 
-def poll_did_talk(talk_id, max_wait=180):
-    """
-    Poll D-ID until video is ready or timeout.
-    D-ID typically takes 30-90 seconds for a 45-second video.
-    Returns the result_url or None.
-    """
-    print(f"[D-ID] Waiting for video to render (up to {max_wait}s)...")
+def poll_sadtalker(pred_id, max_wait=600):
+    """Poll Replicate until video is ready. SadTalker typically takes 3-8 min."""
+    print(f"[Replicate] Waiting for render (up to {max_wait//60} min)...")
+    headers = {"Authorization": f"Token {REPLICATE_API_TOKEN}"}
     start = time.time()
     attempt = 0
 
     while time.time() - start < max_wait:
-        time.sleep(8)
+        time.sleep(15)
         attempt += 1
-        status, resp = http("GET", f"{D_ID_API_BASE}/talks/{talk_id}", headers=d_id_headers(), timeout=15)
+        status, resp = http(
+            "GET", f"https://api.replicate.com/v1/predictions/{pred_id}",
+            headers=headers, timeout=15,
+        )
 
         if status != 200:
-            print(f"[D-ID] Poll error {status}: {resp}")
+            print(f"[Replicate] Poll error {status}: {resp}")
             continue
 
-        talk_status = resp.get("status", "")
-        print(f"[D-ID] Status [{attempt}]: {talk_status}")
+        pred_status = resp.get("status", "")
+        print(f"[Replicate] Status [{attempt}]: {pred_status}")
 
-        if talk_status == "done":
-            result_url = resp.get("result_url")
-            if result_url:
-                print(f"[D-ID] Video ready: {result_url[:60]}...")
-                return result_url
-            print("[D-ID] Done but no result_url in response")
+        if pred_status == "succeeded":
+            output = resp.get("output")
+            if output:
+                video_url = output if isinstance(output, str) else output[0]
+                print(f"[Replicate] Video ready: {video_url[:70]}... ✓")
+                return video_url
+            print("[Replicate] Succeeded but output is empty")
             return None
 
-        if talk_status == "error":
-            error = resp.get("error", {})
-            print(f"[D-ID] Render error: {error}")
+        if pred_status in ("failed", "canceled"):
+            print(f"[Replicate] Prediction {pred_status}: {resp.get('error', 'unknown')}")
             return None
 
-    print(f"[D-ID] Timeout after {max_wait}s")
+    print(f"[Replicate] Timeout after {max_wait}s")
     return None
 
 def download_video(video_url, tmp_path):
-    """Download the D-ID video to a temp file."""
-    print(f"[Video] Downloading from D-ID...")
+    """Download MP4 from Replicate to a local temp file."""
+    print(f"[Video] Downloading from Replicate...")
     try:
         urllib.request.urlretrieve(video_url, tmp_path)
         import os as _os
@@ -366,46 +358,18 @@ def download_video(video_url, tmp_path):
         return False
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 3 — UPLOAD TO GITHUB PAGES
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def upload_to_pages(local_path, repo_path):
-    """Upload MP4 to GitHub repo → served via GitHub Pages as public URL."""
-    with open(local_path, "rb") as f:
-        raw = f.read()
-    encoded  = base64.b64encode(raw).decode()
-    gh_url   = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{repo_path}"
-    headers  = {
-        "Authorization": f"token {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github.v3+json",
-    }
-    # Check for existing file sha
-    status, existing = http("GET", gh_url, headers=headers, timeout=15)
-    sha = existing.get("sha") if status == 200 else None
-
-    body = {"message": f"auto: reel {repo_path}", "content": encoded}
-    if sha:
-        body["sha"] = sha
-
-    print(f"[Upload] Uploading video to GitHub Pages ({len(raw)/1024/1024:.1f} MB)...")
-    status, resp = http("PUT", gh_url, headers=headers, data=body, timeout=120)
-
-    if status in (200, 201):
-        public_url = f"https://hcprelog.github.io/public-assets/{repo_path}"
-        print(f"[Upload] Live at: {public_url}")
-        return public_url
-
-    print(f"[Upload] Failed {status}: {resp}")
-    return None
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# STEP 4 — INSTAGRAM REEL POST
+# STEP 5 — INSTAGRAM REEL POST
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def generate_reel_caption(topic, avatar_key):
-    """Short Instagram caption for the Reel."""
     if not ANTHROPIC_API_KEY:
-        return f"Watch to the end.\n\nH&C PRECISE LOGISTICS LLC — GovCon execution support.\nSDVOSB + HubZone certified.\nhcprelog.com\n\n#GovCon #SDVOSB #HubZone #FederalContracting #SmallBusiness #VeteranOwned #HCPreciseLogistics"
+        return (
+            "Watch to the end.\n\n"
+            "H&C PRECISE LOGISTICS LLC — GovCon execution support.\n"
+            "SDVOSB + HubZone certified.\nhcprelog.com\n\n"
+            "#GovCon #SDVOSB #HubZone #FederalContracting #SmallBusiness "
+            "#VeteranOwned #HCPreciseLogistics"
+        )
 
     headers = {
         "x-api-key": ANTHROPIC_API_KEY,
@@ -416,27 +380,34 @@ def generate_reel_caption(topic, avatar_key):
         "model": "claude-opus-4-5",
         "max_tokens": 200,
         "messages": [{"role": "user", "content": (
-            f"Write a short Instagram Reel caption (max 50 words + 10 hashtags) for H&C PRECISE LOGISTICS LLC.\n"
+            f"Write a short Instagram Reel caption (max 50 words + 10 hashtags) "
+            f"for H&C PRECISE LOGISTICS LLC.\n"
             f"Topic: {topic['title']}\n"
             f"End with: hcprelog.com\n"
             f"Keep it punchy. Start with 'Watch to the end.' or a similar hook."
-        )}]
+        )}],
     }
-    status, resp = http("POST", "https://api.anthropic.com/v1/messages", headers=headers, data=body, timeout=20)
+    status, resp = http(
+        "POST", "https://api.anthropic.com/v1/messages",
+        headers=headers, data=body, timeout=20,
+    )
     if status == 200:
         return resp["content"][0]["text"].strip()
-    return f"Watch to the end.\n\nhcprelog.com\n\n#GovCon #SDVOSB #HubZone #FederalContracting #HCPreciseLogistics"
+    return (
+        "Watch to the end.\n\nhcprelog.com\n\n"
+        "#GovCon #SDVOSB #HubZone #FederalContracting #HCPreciseLogistics"
+    )
 
 def ig_post_reel(video_url, caption):
     """Post video as Instagram Reel via Graph API."""
     print(f"\n[Instagram] Creating Reel container...")
 
     params = urllib.parse.urlencode({
-        "media_type": "REELS",
-        "video_url": video_url,
-        "caption": caption,
+        "media_type":    "REELS",
+        "video_url":     video_url,
+        "caption":       caption,
         "share_to_feed": "true",
-        "access_token": INSTAGRAM_ACCESS_TOKEN,
+        "access_token":  INSTAGRAM_ACCESS_TOKEN,
     })
     status, resp = http(
         "POST",
@@ -453,10 +424,12 @@ def ig_post_reel(video_url, caption):
     container_id = resp["id"]
     print(f"[Instagram] Container: {container_id} — processing...")
 
-    # Poll until video is processed by Instagram (up to 4 min)
     for attempt in range(30):
         time.sleep(8)
-        check_url = f"{IG_API_BASE}/{container_id}?fields=status_code,status&access_token={INSTAGRAM_ACCESS_TOKEN}"
+        check_url = (
+            f"{IG_API_BASE}/{container_id}"
+            f"?fields=status_code,status&access_token={INSTAGRAM_ACCESS_TOKEN}"
+        )
         _, check = http("GET", check_url, timeout=15)
         status_code = check.get("status_code", "")
         print(f"[Instagram] Container status [{attempt+1}/30]: {status_code}")
@@ -466,9 +439,8 @@ def ig_post_reel(video_url, caption):
             print(f"[Instagram] Processing error: {check}")
             return False
 
-    # Publish
     pub_params = urllib.parse.urlencode({
-        "creation_id": container_id,
+        "creation_id":  container_id,
         "access_token": INSTAGRAM_ACCESS_TOKEN,
     })
     pub_status, pub_resp = http(
@@ -492,7 +464,7 @@ def ig_post_reel(video_url, caption):
 
 def main():
     print("=" * 60)
-    print("H&C PRECISE LOGISTICS LLC — Reels Creator (D-ID)")
+    print("H&C PRECISE LOGISTICS LLC — Reels Creator (ElevenLabs + Replicate SadTalker)")
     print(f"Run time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     print("=" * 60)
 
@@ -508,48 +480,62 @@ def main():
     # Step 1: Generate script
     script = generate_script(topic)
 
-    # Step 2: Pre-upload avatar to D-ID CDN (avoids rekognition external URL errors)
-    did_image_url = upload_avatar_to_did(avatar_url)
-    if not did_image_url:
-        print("FATAL: could not upload avatar to D-ID")
+    # Step 2: Generate audio via ElevenLabs TTS
+    audio_bytes = generate_audio_elevenlabs(script, avatar_key)
+    if not audio_bytes:
+        print("FATAL: ElevenLabs audio generation failed")
         sys.exit(1)
 
-    # Step 3: Create D-ID talking video
-    talk_id = create_did_talk(did_image_url, script, avatar_key)
-    if not talk_id:
-        print("FATAL: D-ID talk creation failed")
+    # Step 3: Upload audio to GitHub — use raw URL (no CDN wait, immediate access)
+    date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
+    audio_repo_path = f"temp/audio_{topic['id']}_{date_str}.mp3"
+    audio_raw_url, _ = upload_to_github(audio_bytes, audio_repo_path, is_bytes=True)
+    if not audio_raw_url:
+        print("FATAL: audio upload to GitHub failed")
         sys.exit(1)
 
-    video_url_did = poll_did_talk(talk_id)
-    if not video_url_did:
-        print("FATAL: D-ID video render failed or timed out")
+    print("[Wait] Waiting 10s for audio to be accessible via raw URL...")
+    time.sleep(10)
+
+    # Step 4: Get SadTalker version and create video
+    sadtalker_version = get_sadtalker_version()
+    if not sadtalker_version:
+        print("FATAL: could not fetch SadTalker version from Replicate")
         sys.exit(1)
 
-    # Step 4: Download and upload to GitHub Pages
+    pred_id = create_sadtalker_prediction(avatar_url, audio_raw_url, sadtalker_version)
+    if not pred_id:
+        print("FATAL: Replicate SadTalker submission failed")
+        sys.exit(1)
+
+    replicate_video_url = poll_sadtalker(pred_id)
+    if not replicate_video_url:
+        print("FATAL: Replicate video render failed or timed out")
+        sys.exit(1)
+
+    # Step 5: Download video and upload to GitHub Pages for Instagram
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_video = os.path.join(tmp_dir, "reel.mp4")
 
-        if not download_video(video_url_did, tmp_video):
-            print("FATAL: could not download D-ID video")
+        if not download_video(replicate_video_url, tmp_video):
+            print("FATAL: could not download video from Replicate")
             sys.exit(1)
 
-        date_str = datetime.now(timezone.utc).strftime("%Y%m%d")
-        repo_path = f"videos/reel_{topic['id']}_{date_str}.mp4"
-        public_url = upload_to_pages(tmp_video, repo_path)
+        video_repo_path = f"videos/reel_{topic['id']}_{date_str}.mp4"
+        _, video_pages_url = upload_to_github(tmp_video, video_repo_path)
 
-    if not public_url:
-        # Fallback: try using D-ID URL directly
-        print("[Upload] GitHub Pages upload failed — trying D-ID URL directly")
-        public_url = video_url_did
+    if not video_pages_url:
+        print("[Upload] GitHub Pages upload failed — using Replicate URL directly")
+        video_pages_url = replicate_video_url
 
-    # Wait for GitHub Pages CDN propagation
-    if "github.io" in public_url:
+    # Wait for GitHub Pages CDN — Instagram must be able to fetch the URL
+    if "github.io" in video_pages_url:
         print("[Wait] Waiting 45s for GitHub Pages CDN...")
         time.sleep(45)
 
-    # Step 5: Generate caption and post to Instagram
+    # Step 6: Generate caption and post to Instagram
     caption = generate_reel_caption(topic, avatar_key)
-    success = ig_post_reel(public_url, caption)
+    success = ig_post_reel(video_pages_url, caption)
 
     if success:
         print(f"\n✓ Reel posted! Topic: {topic['id']} | Avatar: {avatar_key}")
