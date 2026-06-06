@@ -1,17 +1,17 @@
 """
-H&C PRECISE LOGISTICS LLC — Instagram Reels Creator (edge-tts + Replicate SadTalker)
+H&C PRECISE LOGISTICS LLC — Instagram Reels Creator (ElevenLabs + Replicate SadTalker)
 Runs weekly (Wednesdays 10AM ET) via instagram-reel.yml
 
 Pipeline:
 1. Pick a weekly Reel topic (Marcus or Arielle)
 2. Generate 30-45 second talking script via Claude
-3. Generate audio via edge-tts (Microsoft Neural TTS — free, no API key, no IP blocks)
+3. Generate audio via ElevenLabs TTS (primary) or edge-tts fallback
 4. Upload audio to GitHub repo → raw URL (immediate, no CDN wait)
 5. Send avatar image + audio to Replicate SadTalker → talking head MP4 (~$0.50/video)
 6. Download MP4, upload to GitHub Pages → public URL
 7. Post as Instagram Reel via Graph API
 
-Cost: ~$0.50/video (Replicate only — TTS is free). No watermarks.
+Cost: ~$0.50/video (Replicate only). No watermarks.
 """
 
 import os
@@ -29,6 +29,7 @@ INSTAGRAM_USER_ID      = os.environ["INSTAGRAM_USER_ID"]
 INSTAGRAM_ACCESS_TOKEN = os.environ["INSTAGRAM_ACCESS_TOKEN"]
 ANTHROPIC_API_KEY      = os.environ.get("ANTHROPIC_API_KEY", "")
 REPLICATE_API_TOKEN    = os.environ["REPLICATE_API_TOKEN"]
+ELEVENLABS_API_KEY     = os.environ.get("ELEVENLABS_API_KEY", "")
 GITHUB_TOKEN           = os.environ["GITHUB_TOKEN"]
 GITHUB_REPO            = os.environ.get("GITHUB_REPOSITORY", "hcprelog/public-assets")
 
@@ -40,10 +41,16 @@ AVATAR_IMAGES = {
     "arielle": "https://raw.githubusercontent.com/hcprelog/public-assets/main/avatars/Arielle%20Grant.png",
 }
 
-# Microsoft Neural TTS voices via edge-tts (free, no API key)
-AVATAR_VOICES = {
-    "marcus":  "en-US-ChristopherNeural",  # deep, authoritative male
-    "arielle": "en-US-AriaNeural",         # warm, clear female
+# ElevenLabs voice IDs (primary — natural, human-quality)
+ELEVENLABS_VOICES = {
+    "marcus":  "pNInz6obpgDQGcFmaJgB",  # Adam — deep, authoritative American male
+    "arielle": "21m00Tcm4TlvDq8ikWAM",  # Rachel — warm, clear American female
+}
+
+# edge-tts fallback voices (Microsoft Neural TTS — free, used if ElevenLabs fails)
+EDGETTS_VOICES = {
+    "marcus":  "en-US-ChristopherNeural",
+    "arielle": "en-US-AriaNeural",
 }
 
 # Acronym expansion — TTS will mispronounce these if left as-is
@@ -86,7 +93,7 @@ AVATAR_PERSONAS = {
     ),
 }
 
-# ── HTTP helper ───────────────────────────────────────────────────────────────
+# ── HTTP helpers ──────────────────────────────────────────────────────────────
 def http(method, url, headers=None, data=None, timeout=60):
     headers = headers or {}
     if isinstance(data, dict):
@@ -103,6 +110,19 @@ def http(method, url, headers=None, data=None, timeout=60):
             return e.code, json.loads(body)
         except Exception:
             return e.code, {"error": body}
+
+def http_binary(method, url, headers=None, data=None, timeout=60):
+    """HTTP request that returns raw bytes (for audio download)."""
+    headers = headers or {}
+    if isinstance(data, dict):
+        data = json.dumps(data).encode()
+        headers.setdefault("Content-Type", "application/json")
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.status, r.read()
+    except urllib.error.HTTPError as e:
+        return e.code, e.read()
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 1 — SCRIPT GENERATION
@@ -177,16 +197,54 @@ def fallback_script(topic):
     )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 2 — EDGE-TTS AUDIO (Microsoft Neural TTS — free, no API key)
+# STEP 2 — AUDIO GENERATION (ElevenLabs primary, edge-tts fallback)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def generate_audio_elevenlabs(script, avatar_key):
+    """Generate MP3 audio via ElevenLabs (natural human-quality voice)."""
+    voice_id   = ELEVENLABS_VOICES.get(avatar_key, ELEVENLABS_VOICES["arielle"])
+    voice_name = "Adam" if avatar_key == "marcus" else "Rachel"
+    print(f"\n[ElevenLabs] Generating audio — avatar: {avatar_key}, voice: {voice_name}")
+
+    headers = {
+        "xi-api-key":   ELEVENLABS_API_KEY,
+        "Content-Type": "application/json",
+        "Accept":       "audio/mpeg",
+        "User-Agent":   "HCPreciseLogistics-ReelBot/1.0",
+    }
+    body = {
+        "text": script,
+        "model_id": "eleven_turbo_v2_5",
+        "voice_settings": {
+            "stability":        0.45,
+            "similarity_boost": 0.80,
+            "style":            0.35,
+            "use_speaker_boost": True,
+        },
+    }
+    status, audio_bytes = http_binary(
+        "POST",
+        f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id}",
+        headers=headers,
+        data=body,
+        timeout=30,
+    )
+    if status == 200 and len(audio_bytes) > 1000:
+        print(f"[ElevenLabs] Audio generated: {len(audio_bytes):,} bytes ✓")
+        return audio_bytes
+
+    err = audio_bytes.decode(errors="replace")[:200]
+    print(f"[ElevenLabs] Error {status}: {err}")
+    print("[ElevenLabs] → Falling back to edge-tts...")
+    return generate_audio_edge_tts(script, avatar_key)
+
 def generate_audio_edge_tts(script, avatar_key):
-    """Generate MP3 audio via edge-tts (Microsoft Neural TTS). Free, no API key."""
+    """Fallback: Generate MP3 audio via edge-tts (Microsoft Neural TTS — free)."""
     import asyncio
     import edge_tts
     import tempfile
 
-    voice = AVATAR_VOICES.get(avatar_key, AVATAR_VOICES["arielle"])
+    voice = EDGETTS_VOICES.get(avatar_key, EDGETTS_VOICES["arielle"])
     print(f"\n[edge-tts] Generating audio — avatar: {avatar_key}, voice: {voice}")
 
     tmp_path = tempfile.mktemp(suffix=".mp3")
@@ -280,11 +338,11 @@ def create_sadtalker_prediction(avatar_url, audio_url, version):
         "input": {
             "source_image":     avatar_url,
             "driven_audio":     audio_url,
-            "preprocess":       "crop",
-            "still_mode":       True,
+            "preprocess":       "full",   # animate whole image, not just cropped face
+            "still_mode":       False,    # natural head movement (not locked still)
             "use_enhancer":     False,
             "size_of_image":    256,
-            "expression_scale": 1.0,
+            "expression_scale": 1.4,      # more expressive lip/brow movement
         },
     }
 
@@ -473,10 +531,10 @@ def main():
     # Step 1: Generate script
     script = generate_script(topic)
 
-    # Step 2: Generate audio via edge-tts (Microsoft Neural TTS)
-    audio_bytes = generate_audio_edge_tts(script, avatar_key)
+    # Step 2: Generate audio — ElevenLabs primary, edge-tts fallback
+    audio_bytes = generate_audio_elevenlabs(script, avatar_key)
     if not audio_bytes:
-        print("FATAL: edge-tts audio generation failed")
+        print("FATAL: audio generation failed (both ElevenLabs and edge-tts)")
         sys.exit(1)
 
     # Step 3: Upload audio to GitHub — use raw URL (no CDN wait, immediate access)
