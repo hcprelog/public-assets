@@ -19,10 +19,11 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Set up FFmpeg
+        uses: FedericoCarboni/setup-ffmpeg@v3
+
       - name: Install dependencies
-        run: |
-          sudo apt-get install -y ffmpeg
-          pip install anthropic edge-tts
+        run: pip install anthropic edge-tts
 
       - name: Create and post Reel
         env:
