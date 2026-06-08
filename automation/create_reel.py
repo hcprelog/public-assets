@@ -498,16 +498,24 @@ def create_sadtalker_prediction(avatar_url, audio_url, version):
         },
     }
 
-    status, resp = http(
-        "POST", "https://api.replicate.com/v1/predictions",
-        headers=_replicate_headers(), data=body, timeout=30,
-    )
-    if status in (200, 201):
-        pred_id = resp["id"]
-        print(f"[Replicate] Prediction created: {pred_id} ✓")
-        return pred_id
-
-    print(f"[Replicate] Submission failed {status}: {resp}")
+    for attempt in range(3):
+        status, resp = http(
+            "POST", "https://api.replicate.com/v1/predictions",
+            headers=_replicate_headers(), data=body, timeout=30,
+        )
+        if status in (200, 201):
+            pred_id = resp["id"]
+            print(f"[Replicate] Prediction created: {pred_id} ✓")
+            return pred_id
+        if status == 429:
+            retry_after = int(resp.get("retry_after", 15))
+            wait = retry_after + 5   # buffer over retry_after
+            print(f"[Replicate] Rate limited (429) — waiting {wait}s (attempt {attempt+1}/3)...")
+            time.sleep(wait)
+            continue
+        print(f"[Replicate] Submission failed {status}: {resp}")
+        return None
+    print("[Replicate] Submission failed after 3 attempts (429 rate limit persistent)")
     return None
 
 def poll_sadtalker(pred_id, max_wait=1200):
@@ -736,28 +744,27 @@ def main():
     # Step 4: Generate talking video
     # Primary: Wan 2.2 S2V — full body movement + lip sync from portrait + audio
     # Fallback: SadTalker — head/face only (proven, reliable)
+    # Wan 2.2 S2V (full body movement) is DISABLED — requires paid Replicate credits.
+    # It returns 402 Insufficient credit when account balance is below threshold,
+    # and the failed attempt still burns the burst rate-limit slot (burst=1 when
+    # balance < $5), which causes SadTalker to 429 immediately after.
+    # Re-enable when Hunter explicitly approves Wan S2V credit spend.
+    wan_used = False
     raw_video_url = None
 
-    print("\n[Video] Trying Wan 2.2 S2V (full body movement)...")
-    wan_pred = create_wan_s2v_prediction(avatar_url, audio_raw_url)
-    if wan_pred:
-        raw_video_url = poll_wan_s2v(wan_pred)
-    wan_used = raw_video_url is not None
+    print("\n[Video] Generating video via SadTalker (talking head + lip sync)...")
+    sadtalker_version = get_sadtalker_version()
+    if not sadtalker_version:
+        print("FATAL: could not fetch SadTalker version from Replicate")
+        sys.exit(1)
+    pred_id = create_sadtalker_prediction(avatar_url, audio_raw_url, sadtalker_version)
+    if not pred_id:
+        print("FATAL: SadTalker submission failed")
+        sys.exit(1)
+    raw_video_url = poll_sadtalker(pred_id)
 
     if not raw_video_url:
-        print("\n[Video] Wan S2V unavailable — falling back to SadTalker (head only)...")
-        sadtalker_version = get_sadtalker_version()
-        if not sadtalker_version:
-            print("FATAL: could not fetch SadTalker version from Replicate")
-            sys.exit(1)
-        pred_id = create_sadtalker_prediction(avatar_url, audio_raw_url, sadtalker_version)
-        if not pred_id:
-            print("FATAL: SadTalker submission failed")
-            sys.exit(1)
-        raw_video_url = poll_sadtalker(pred_id)
-
-    if not raw_video_url:
-        print("FATAL: Video render failed (both Wan S2V and SadTalker)")
+        print("FATAL: Video render failed (SadTalker)")
         sys.exit(1)
 
     # Step 4b: LatentSync — improve lip sync quality on top of any video source
