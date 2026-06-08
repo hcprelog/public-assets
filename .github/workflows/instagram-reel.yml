@@ -20,7 +20,9 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: pip install anthropic edge-tts
+        run: |
+          sudo apt-get install -y ffmpeg
+          pip install anthropic edge-tts
 
       - name: Create and post Reel
         env:
