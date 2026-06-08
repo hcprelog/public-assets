@@ -310,7 +310,138 @@ def upload_to_github(source, repo_path, is_bytes=False):
     return None, None
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 4 — REPLICATE SADTALKER VIDEO
+# STEP 4A — WAN 2.2 S2V (primary: full-body movement + lip sync)
+# Portrait image + audio → natural body/hand/arm movement + lip sync
+# Falls back to SadTalker if unavailable or fails
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def get_wan_s2v_version():
+    """Fetch the latest Wan 2.2 S2V version ID from Replicate."""
+    status, resp = http(
+        "GET",
+        "https://api.replicate.com/v1/models/wan-video/wan-2.2-s2v/versions",
+        headers=_replicate_headers(),
+        timeout=15,
+    )
+    if status == 200 and resp.get("results"):
+        version = resp["results"][0]["id"]
+        print(f"[Wan S2V] Version: {version[:16]}...")
+        return version
+    print(f"[Wan S2V] Not available ({status}) — will use SadTalker fallback")
+    return None
+
+def create_wan_s2v_prediction(avatar_url, audio_url, version):
+    """Submit Wan 2.2 S2V prediction. Returns prediction ID."""
+    print(f"\n[Wan S2V] Submitting prediction (full body movement + lip sync)...")
+    print(f"[Wan S2V] Avatar: {avatar_url[:70]}...")
+    print(f"[Wan S2V] Audio:  {audio_url[:70]}...")
+    body = {
+        "version": version,
+        "input": {
+            "image": avatar_url,
+            "audio": audio_url,
+        },
+    }
+    status, resp = http(
+        "POST", "https://api.replicate.com/v1/predictions",
+        headers=_replicate_headers(), data=body, timeout=30,
+    )
+    if status in (200, 201):
+        pred_id = resp["id"]
+        print(f"[Wan S2V] Prediction created: {pred_id} ✓")
+        return pred_id
+    print(f"[Wan S2V] Submission failed {status}: {resp}")
+    return None
+
+def poll_wan_s2v(pred_id, max_wait=1200):
+    """Poll Wan 2.2 S2V until video is ready."""
+    print(f"[Wan S2V] Waiting for render (up to {max_wait//60} min)...")
+    start = time.time()
+    attempt = 0
+    while time.time() - start < max_wait:
+        time.sleep(15)
+        attempt += 1
+        status, resp = http(
+            "GET", f"https://api.replicate.com/v1/predictions/{pred_id}",
+            headers=_replicate_headers(), timeout=15,
+        )
+        if status != 200:
+            print(f"[Wan S2V] Poll error {status}")
+            continue
+        pred_status = resp.get("status", "")
+        print(f"[Wan S2V] Status [{attempt}]: {pred_status}")
+        if pred_status == "succeeded":
+            output = resp.get("output")
+            if output:
+                url = output if isinstance(output, str) else output[0]
+                print(f"[Wan S2V] Video ready: {str(url)[:70]}... ✓")
+                return url
+            print("[Wan S2V] Succeeded but output empty")
+            return None
+        if pred_status in ("failed", "canceled"):
+            print(f"[Wan S2V] {pred_status}: {resp.get('error', 'unknown')}")
+            return None
+    print(f"[Wan S2V] Timeout after {max_wait}s")
+    return None
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 4B — LATENTSYNC (lip sync enhancement — runs on any video output)
+# Replaces robotic mouth movements with precise audio-driven lip sync
+# bytedance/latentsync — ~$0.10/run, ~104s, dramatically better sync
+# ═══════════════════════════════════════════════════════════════════════════════
+
+LATENTSYNC_VERSION = "637ce191"
+
+def run_latentsync(video_url, audio_url):
+    """
+    Apply LatentSync on top of a talking-head video for much better lip sync.
+    Works on both Wan S2V and SadTalker output. Fails silently — raw video
+    is used as fallback if LatentSync errors out.
+    """
+    print(f"\n[LatentSync] Improving lip sync quality...")
+    body = {
+        "version": LATENTSYNC_VERSION,
+        "input": {
+            "video": video_url,
+            "audio": audio_url,
+        },
+    }
+    status, resp = http(
+        "POST", "https://api.replicate.com/v1/predictions",
+        headers=_replicate_headers(), data=body, timeout=30,
+    )
+    if status not in (200, 201):
+        print(f"[LatentSync] Submission failed {status}: {resp}")
+        return None
+    pred_id = resp["id"]
+    print(f"[LatentSync] Prediction created: {pred_id} ✓")
+
+    start = time.time()
+    attempt = 0
+    while time.time() - start < 360:    # 6-min max
+        time.sleep(10)
+        attempt += 1
+        s, r = http(
+            "GET", f"https://api.replicate.com/v1/predictions/{pred_id}",
+            headers=_replicate_headers(), timeout=15,
+        )
+        ps = r.get("status", "")
+        print(f"[LatentSync] Status [{attempt}]: {ps}")
+        if ps == "succeeded":
+            out = r.get("output")
+            if out:
+                url = out if isinstance(out, str) else out[0]
+                print(f"[LatentSync] ✓ Enhanced lip sync ready")
+                return url
+            return None
+        if ps in ("failed", "canceled"):
+            print(f"[LatentSync] Failed: {r.get('error', 'unknown')}")
+            return None
+    print(f"[LatentSync] Timeout — using raw video")
+    return None
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 4C — SADTALKER (fallback when Wan S2V is unavailable)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _replicate_headers():
@@ -564,7 +695,7 @@ def ig_post_reel(video_url, caption):
 
 def main():
     print("=" * 60)
-    print("H&C PRECISE LOGISTICS LLC — Reels Creator (ElevenLabs + Replicate SadTalker)")
+    print("H&C PRECISE LOGISTICS LLC — Reels Creator (Wan S2V + LatentSync + SadTalker)")
     print(f"Run time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     print("=" * 60)
 
@@ -597,28 +728,47 @@ def main():
     print("[Wait] Waiting 10s for audio to be accessible via raw URL...")
     time.sleep(10)
 
-    # Step 4: Get SadTalker version and create video
-    sadtalker_version = get_sadtalker_version()
-    if not sadtalker_version:
-        print("FATAL: could not fetch SadTalker version from Replicate")
+    # Step 4: Generate talking video
+    # Primary: Wan 2.2 S2V — full body movement + lip sync from portrait + audio
+    # Fallback: SadTalker — head/face only (proven, reliable)
+    raw_video_url = None
+
+    print("\n[Video] Trying Wan 2.2 S2V (full body movement)...")
+    wan_version = get_wan_s2v_version()
+    if wan_version:
+        wan_pred = create_wan_s2v_prediction(avatar_url, audio_raw_url, wan_version)
+        if wan_pred:
+            raw_video_url = poll_wan_s2v(wan_pred)
+
+    if not raw_video_url:
+        print("\n[Video] Wan S2V unavailable — falling back to SadTalker (head only)...")
+        sadtalker_version = get_sadtalker_version()
+        if not sadtalker_version:
+            print("FATAL: could not fetch SadTalker version from Replicate")
+            sys.exit(1)
+        pred_id = create_sadtalker_prediction(avatar_url, audio_raw_url, sadtalker_version)
+        if not pred_id:
+            print("FATAL: SadTalker submission failed")
+            sys.exit(1)
+        raw_video_url = poll_sadtalker(pred_id)
+
+    if not raw_video_url:
+        print("FATAL: Video render failed (both Wan S2V and SadTalker)")
         sys.exit(1)
 
-    pred_id = create_sadtalker_prediction(avatar_url, audio_raw_url, sadtalker_version)
-    if not pred_id:
-        print("FATAL: Replicate SadTalker submission failed")
-        sys.exit(1)
-
-    replicate_video_url = poll_sadtalker(pred_id)
-    if not replicate_video_url:
-        print("FATAL: Replicate video render failed or timed out")
-        sys.exit(1)
+    # Step 4b: LatentSync — improve lip sync quality on top of any video source
+    # Works on both Wan S2V and SadTalker output. Fails silently.
+    enhanced_url = run_latentsync(raw_video_url, audio_raw_url)
+    final_video_url = enhanced_url if enhanced_url else raw_video_url
+    print(f"[Video] Source: {'Wan S2V' if wan_version else 'SadTalker'} + "
+          f"{'LatentSync enhanced' if enhanced_url else 'raw (LatentSync skipped)'}")
 
     # Step 5: Download video, convert to Instagram spec, upload to GitHub Pages
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_raw   = os.path.join(tmp_dir, "reel_raw.mp4")
         tmp_final = os.path.join(tmp_dir, "reel_final.mp4")
 
-        if not download_video(replicate_video_url, tmp_raw):
+        if not download_video(final_video_url, tmp_raw):
             print("FATAL: could not download video from Replicate")
             sys.exit(1)
 
@@ -635,7 +785,7 @@ def main():
 
     if not video_pages_url:
         print("[Upload] GitHub Pages upload failed — using Replicate URL directly")
-        video_pages_url = replicate_video_url
+        video_pages_url = final_video_url
 
     # Wait for GitHub Pages CDN — Instagram must be able to fetch the URL
     if "github.io" in video_pages_url:
