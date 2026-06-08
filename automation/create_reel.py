@@ -1,17 +1,17 @@
 """
-H&C PRECISE LOGISTICS LLC — Instagram Reels Creator (ElevenLabs + Replicate SadTalker)
+H&C PRECISE LOGISTICS LLC — Instagram Reels Creator (OpenAI TTS + Replicate Hallo2)
 Runs weekly (Wednesdays 10AM ET) via instagram-reel.yml
 
 Pipeline:
 1. Pick a weekly Reel topic (Marcus or Arielle)
 2. Generate 30-45 second talking script via Claude
-3. Generate audio via ElevenLabs TTS (primary) or edge-tts fallback
+3. Generate audio via OpenAI TTS tts-1-hd (primary) or edge-tts fallback
 4. Upload audio to GitHub repo → raw URL (immediate, no CDN wait)
-5. Send avatar image + audio to Replicate SadTalker → talking head MP4 (~$0.50/video)
+5. Send avatar image + audio to Replicate Hallo2 → talking head MP4 (~$0.50-1.00/video)
 6. Download MP4, upload to GitHub Pages → public URL
 7. Post as Instagram Reel via Graph API
 
-Cost: ~$0.50/video (Replicate only). No watermarks.
+Cost: ~$0.52/video (Replicate + OpenAI TTS). No watermarks.
 """
 
 import os
@@ -295,7 +295,7 @@ def upload_to_github(source, repo_path, is_bytes=False):
     return None, None
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# STEP 4 — REPLICATE SADTALKER VIDEO
+# STEP 4 — REPLICATE HALLO2 VIDEO
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def _replicate_headers():
@@ -305,38 +305,36 @@ def _replicate_headers():
         "User-Agent": "HCPreciseLogistics-ReelBot/1.0",
     }
 
-def get_sadtalker_version():
-    """Fetch the latest SadTalker version ID from Replicate."""
-    headers = _replicate_headers()
+def get_hallo_version():
+    """Fetch the latest Hallo2 version ID from Replicate."""
     status, resp = http(
         "GET",
-        "https://api.replicate.com/v1/models/cjwbw/sadtalker/versions",
-        headers=headers,
+        "https://api.replicate.com/v1/models/zsxkib/hallo2/versions",
+        headers=_replicate_headers(),
         timeout=15,
     )
     if status == 200 and resp.get("results"):
         version = resp["results"][0]["id"]
-        print(f"[Replicate] SadTalker version: {version[:16]}...")
+        print(f"[Replicate] Hallo2 version: {version[:16]}...")
         return version
-    print(f"[Replicate] Could not fetch version: {status} {resp}")
+    print(f"[Replicate] Could not fetch Hallo2 version: {status} {resp}")
     return None
 
-def create_sadtalker_prediction(avatar_url, audio_url, version):
-    """Submit a SadTalker prediction. Returns prediction ID."""
-    print(f"\n[Replicate] Submitting SadTalker prediction...")
+def create_hallo_prediction(avatar_url, audio_url, version):
+    """Submit a Hallo2 prediction. Returns prediction ID."""
+    print(f"\n[Replicate] Submitting Hallo2 prediction...")
     print(f"[Replicate] Avatar: {avatar_url[:70]}...")
     print(f"[Replicate] Audio:  {audio_url[:70]}...")
 
     body = {
         "version": version,
         "input": {
-            "source_image":     avatar_url,
-            "driven_audio":     audio_url,
-            "preprocess":       "full",   # animate whole image, not just cropped face
-            "still_mode":       False,    # natural head movement (not locked still)
-            "use_enhancer":     False,
-            "size_of_image":    256,
-            "expression_scale": 1.4,      # more expressive lip/brow movement
+            "source_image":      avatar_url,
+            "driving_audio":     audio_url,
+            "pose_weight":       1.0,   # head pose movement
+            "face_weight":       1.0,   # facial expression
+            "lip_weight":        1.2,   # slightly amplified lip sync
+            "face_expand_ratio": 1.2,   # how much face region to show
         },
     }
 
@@ -352,8 +350,8 @@ def create_sadtalker_prediction(avatar_url, audio_url, version):
     print(f"[Replicate] Submission failed {status}: {resp}")
     return None
 
-def poll_sadtalker(pred_id, max_wait=600):
-    """Poll Replicate until video is ready. SadTalker typically takes 3-8 min."""
+def poll_prediction(pred_id, max_wait=600):
+    """Poll Replicate until video is ready."""
     print(f"[Replicate] Waiting for render (up to {max_wait//60} min)...")
     start = time.time()
     attempt = 0
@@ -542,18 +540,18 @@ def main():
     print("[Wait] Waiting 10s for audio to be accessible via raw URL...")
     time.sleep(10)
 
-    # Step 4: Get SadTalker version and create video
-    sadtalker_version = get_sadtalker_version()
-    if not sadtalker_version:
-        print("FATAL: could not fetch SadTalker version from Replicate")
+    # Step 4: Get Hallo2 version and create video
+    hallo_version = get_hallo_version()
+    if not hallo_version:
+        print("FATAL: could not fetch Hallo2 version from Replicate")
         sys.exit(1)
 
-    pred_id = create_sadtalker_prediction(avatar_url, audio_raw_url, sadtalker_version)
+    pred_id = create_hallo_prediction(avatar_url, audio_raw_url, hallo_version)
     if not pred_id:
-        print("FATAL: Replicate SadTalker submission failed")
+        print("FATAL: Replicate Hallo2 submission failed")
         sys.exit(1)
 
-    replicate_video_url = poll_sadtalker(pred_id)
+    replicate_video_url = poll_prediction(pred_id)
     if not replicate_video_url:
         print("FATAL: Replicate video render failed or timed out")
         sys.exit(1)
