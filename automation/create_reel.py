@@ -347,10 +347,18 @@ def create_sadtalker_prediction(avatar_url, audio_url, version):
             "source_image":     avatar_url,
             "driven_audio":     audio_url,
             "preprocess":       "full",
-            "still_mode":       False,
-            "use_enhancer":     True,   # GFPGAN face enhancer for sharper output
+            # still_mode=True: head stays neutral, only lips/jaw move.
+            # SadTalker's head-pose generation is robotic — disabling it
+            # produces a far more natural-looking talking head.
+            "still_mode":       True,
+            # use_enhancer=False: GFPGAN sharpens each frame independently
+            # with no temporal consistency → flickering/glitching between frames.
+            # Disabling it gives smoother, more natural motion.
+            "use_enhancer":     False,
             "size_of_image":    512,    # max resolution
-            "expression_scale": 1.4,
+            # expression_scale=1.0: neutral amplification.
+            # 1.4 was over-exaggerating mouth movement — looked unnatural.
+            "expression_scale": 1.0,
         },
     }
 
@@ -435,7 +443,7 @@ def process_video_for_instagram(input_path, output_path):
         ),
         "-c:v", "libx264",
         "-preset", "fast",
-        "-crf", "23",
+        "-crf", "18",   # high quality (was 23 — lower = sharper, 18 ≈ visually lossless)
         "-c:a", "aac",
         "-b:a", "128k",
         "-movflags", "+faststart",
