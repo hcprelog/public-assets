@@ -401,6 +401,39 @@ def download_video(video_url, tmp_path):
         print(f"[Video] Download failed: {e}")
         return False
 
+def process_video_for_instagram(input_path, output_path):
+    """
+    Re-encode video to Instagram Reels spec: 1080x1920 (9:16), H.264, AAC.
+    SadTalker outputs at low resolution with square aspect ratio — Instagram
+    Reels requires minimum 1080px wide. FFmpeg is pre-installed on ubuntu-latest.
+    """
+    import subprocess
+    print("[FFmpeg] Converting to Instagram Reels format (1080x1920, 9:16)...")
+    cmd = [
+        "ffmpeg", "-y",
+        "-i", input_path,
+        "-vf", (
+            # Scale to fit inside 1080x1920, keep aspect, pad remainder black
+            "scale=1080:1920:force_original_aspect_ratio=decrease,"
+            "pad=1080:1920:(ow-iw)/2:(oh-ih)/2:black,"
+            "setsar=1"
+        ),
+        "-c:v", "libx264",
+        "-preset", "fast",
+        "-crf", "23",
+        "-c:a", "aac",
+        "-b:a", "128k",
+        "-movflags", "+faststart",
+        output_path,
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+    if result.returncode == 0:
+        size = os.path.getsize(output_path)
+        print(f"[FFmpeg] Done: {size/1024/1024:.1f} MB ({size:,} bytes) ✓")
+        return True
+    print(f"[FFmpeg] FFmpeg error:\n{result.stderr[-600:]}")
+    return False
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 5 — INSTAGRAM REEL POST
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -557,16 +590,25 @@ def main():
         print("FATAL: Replicate video render failed or timed out")
         sys.exit(1)
 
-    # Step 5: Download video and upload to GitHub Pages for Instagram
+    # Step 5: Download video, convert to Instagram spec, upload to GitHub Pages
     with tempfile.TemporaryDirectory() as tmp_dir:
-        tmp_video = os.path.join(tmp_dir, "reel.mp4")
+        tmp_raw   = os.path.join(tmp_dir, "reel_raw.mp4")
+        tmp_final = os.path.join(tmp_dir, "reel_final.mp4")
 
-        if not download_video(replicate_video_url, tmp_video):
+        if not download_video(replicate_video_url, tmp_raw):
             print("FATAL: could not download video from Replicate")
             sys.exit(1)
 
+        # Re-encode to Instagram Reels spec (1080x1920, H.264, AAC)
+        # SadTalker outputs square/low-res — this ensures Instagram accepts it
+        if process_video_for_instagram(tmp_raw, tmp_final):
+            upload_video = tmp_final
+        else:
+            print("[FFmpeg] Conversion failed — uploading raw video as fallback")
+            upload_video = tmp_raw
+
         video_repo_path = f"videos/reel_{topic['id']}_{date_str}.mp4"
-        _, video_pages_url = upload_to_github(tmp_video, video_repo_path)
+        _, video_pages_url = upload_to_github(upload_video, video_repo_path)
 
     if not video_pages_url:
         print("[Upload] GitHub Pages upload failed — using Replicate URL directly")
