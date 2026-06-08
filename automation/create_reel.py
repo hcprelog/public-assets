@@ -312,38 +312,26 @@ def upload_to_github(source, repo_path, is_bytes=False):
 # ═══════════════════════════════════════════════════════════════════════════════
 # STEP 4A — WAN 2.2 S2V (primary: full-body movement + lip sync)
 # Portrait image + audio → natural body/hand/arm movement + lip sync
-# Falls back to SadTalker if unavailable or fails
+# Official model — uses /v1/models/{owner}/{name}/predictions (no version hash)
+# Falls back to SadTalker if submission or render fails
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def get_wan_s2v_version():
-    """Fetch the latest Wan 2.2 S2V version ID from Replicate."""
-    status, resp = http(
-        "GET",
-        "https://api.replicate.com/v1/models/wan-video/wan-2.2-s2v/versions",
-        headers=_replicate_headers(),
-        timeout=15,
-    )
-    if status == 200 and resp.get("results"):
-        version = resp["results"][0]["id"]
-        print(f"[Wan S2V] Version: {version[:16]}...")
-        return version
-    print(f"[Wan S2V] Not available ({status}) — will use SadTalker fallback")
-    return None
-
-def create_wan_s2v_prediction(avatar_url, audio_url, version):
-    """Submit Wan 2.2 S2V prediction. Returns prediction ID."""
+def create_wan_s2v_prediction(avatar_url, audio_url):
+    """
+    Submit Wan 2.2 S2V prediction using the official model endpoint.
+    Official Replicate models don't have /versions — call the model endpoint directly.
+    """
     print(f"\n[Wan S2V] Submitting prediction (full body movement + lip sync)...")
     print(f"[Wan S2V] Avatar: {avatar_url[:70]}...")
     print(f"[Wan S2V] Audio:  {audio_url[:70]}...")
     body = {
-        "version": version,
         "input": {
             "image": avatar_url,
             "audio": audio_url,
         },
     }
     status, resp = http(
-        "POST", "https://api.replicate.com/v1/predictions",
+        "POST", "https://api.replicate.com/v1/models/wan-video/wan-2.2-s2v/predictions",
         headers=_replicate_headers(), data=body, timeout=30,
     )
     if status in (200, 201):
@@ -390,17 +378,34 @@ def poll_wan_s2v(pred_id, max_wait=1200):
 # bytedance/latentsync — ~$0.10/run, ~104s, dramatically better sync
 # ═══════════════════════════════════════════════════════════════════════════════
 
-LATENTSYNC_VERSION = "637ce191"
+def get_latentsync_version():
+    """Fetch the latest LatentSync full SHA version hash from Replicate."""
+    status, resp = http(
+        "GET",
+        "https://api.replicate.com/v1/models/bytedance/latentsync/versions",
+        headers=_replicate_headers(),
+        timeout=15,
+    )
+    if status == 200 and resp.get("results"):
+        version = resp["results"][0]["id"]
+        print(f"[LatentSync] Version: {version[:16]}...")
+        return version
+    print(f"[LatentSync] Could not fetch version: {status} — will skip")
+    return None
 
 def run_latentsync(video_url, audio_url):
     """
     Apply LatentSync on top of a talking-head video for much better lip sync.
     Works on both Wan S2V and SadTalker output. Fails silently — raw video
     is used as fallback if LatentSync errors out.
+    Version is fetched dynamically to always use the correct full SHA hash.
     """
     print(f"\n[LatentSync] Improving lip sync quality...")
+    version = get_latentsync_version()
+    if not version:
+        return None
     body = {
-        "version": LATENTSYNC_VERSION,
+        "version": version,
         "input": {
             "video": video_url,
             "audio": audio_url,
@@ -734,11 +739,10 @@ def main():
     raw_video_url = None
 
     print("\n[Video] Trying Wan 2.2 S2V (full body movement)...")
-    wan_version = get_wan_s2v_version()
-    if wan_version:
-        wan_pred = create_wan_s2v_prediction(avatar_url, audio_raw_url, wan_version)
-        if wan_pred:
-            raw_video_url = poll_wan_s2v(wan_pred)
+    wan_pred = create_wan_s2v_prediction(avatar_url, audio_raw_url)
+    if wan_pred:
+        raw_video_url = poll_wan_s2v(wan_pred)
+    wan_used = raw_video_url is not None
 
     if not raw_video_url:
         print("\n[Video] Wan S2V unavailable — falling back to SadTalker (head only)...")
@@ -760,7 +764,7 @@ def main():
     # Works on both Wan S2V and SadTalker output. Fails silently.
     enhanced_url = run_latentsync(raw_video_url, audio_raw_url)
     final_video_url = enhanced_url if enhanced_url else raw_video_url
-    print(f"[Video] Source: {'Wan S2V' if wan_version else 'SadTalker'} + "
+    print(f"[Video] Source: {'Wan S2V' if wan_used else 'SadTalker'} + "
           f"{'LatentSync enhanced' if enhanced_url else 'raw (LatentSync skipped)'}")
 
     # Step 5: Download video, convert to Instagram spec, upload to GitHub Pages
