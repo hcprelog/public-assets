@@ -351,7 +351,7 @@ def create_sadtalker_prediction(avatar_url, audio_url, version):
     print(f"[Replicate] Submission failed {status}: {resp}")
     return None
 
-def poll_sadtalker(pred_id, max_wait=600):
+def poll_sadtalker(pred_id, max_wait=1200):
     """Poll Replicate until video is ready."""
     print(f"[Replicate] Waiting for render (up to {max_wait//60} min)...")
     start = time.time()
