@@ -260,11 +260,19 @@ def generate_audio_edge_tts(script, avatar_key):
 # STEP 3 — GITHUB UPLOAD (audio temp file + final video)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+def get_github_sha(gh_url, headers):
+    """Return the SHA of an existing GitHub file, or None if not found."""
+    status, resp = http("GET", gh_url, headers=headers, timeout=30)
+    sha = resp.get("sha") if status == 200 else None
+    print(f"[Upload] GET existing SHA: status={status}, sha={'found' if sha else 'none'}")
+    return sha
+
 def upload_to_github(source, repo_path, is_bytes=False):
     """
     Upload bytes or a local file to the GitHub repo.
     Returns (raw_githubusercontent_url, github_pages_url).
     raw URL is immediately accessible; pages URL needs ~45s CDN propagation.
+    Handles 422 SHA conflicts by fetching a fresh SHA and retrying once.
     """
     raw = source if is_bytes else open(source, "rb").read()
     encoded = base64.b64encode(raw).decode()
@@ -274,9 +282,7 @@ def upload_to_github(source, repo_path, is_bytes=False):
         "Accept": "application/vnd.github.v3+json",
     }
 
-    status, existing = http("GET", gh_url, headers=headers, timeout=15)
-    sha = existing.get("sha") if status == 200 else None
-
+    sha = get_github_sha(gh_url, headers)
     body = {"message": f"auto: reel {repo_path}", "content": encoded}
     if sha:
         body["sha"] = sha
@@ -284,6 +290,15 @@ def upload_to_github(source, repo_path, is_bytes=False):
     size_mb = len(raw) / 1024 / 1024
     print(f"[Upload] Uploading {repo_path} ({size_mb:.1f} MB)...")
     status, resp = http("PUT", gh_url, headers=headers, data=body, timeout=120)
+
+    # 422 "sha wasn't supplied" = file exists but our GET missed the SHA — retry once
+    if status == 422:
+        print(f"[Upload] 422 conflict — fetching fresh SHA and retrying...")
+        sha2 = get_github_sha(gh_url, headers)
+        if sha2:
+            body["sha"] = sha2
+            status, resp = http("PUT", gh_url, headers=headers, data=body, timeout=120)
+            print(f"[Upload] Retry result: {status}")
 
     if status in (200, 201):
         raw_url   = f"https://raw.githubusercontent.com/{GITHUB_REPO}/main/{repo_path}"
