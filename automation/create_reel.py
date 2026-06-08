@@ -310,6 +310,45 @@ def upload_to_github(source, repo_path, is_bytes=False):
     return None, None
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# ALERT — Gmail SMTP notification for critical pipeline failures
+# Requires GMAIL_APP_PASSWORD GitHub secret (Gmail App Password, not login password).
+# Setup: myaccount.google.com → Security → App Passwords → Other → name it
+# "GitHub Actions" → copy 16-char password → add as GMAIL_APP_PASSWORD secret.
+# Fails silently if secret is absent — pipeline still runs normally.
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def send_email_alert(subject, body):
+    """
+    Send an alert email via Gmail SMTP.
+    Called automatically when Replicate credit hits zero (402) or is critically
+    low (persistent 429 after 3 retries).
+    """
+    import smtplib
+    from email.mime.text import MIMEText
+
+    gmail_app_password = os.environ.get("GMAIL_APP_PASSWORD", "")
+    sender    = "hcprelog@gmail.com"
+    recipient = "dennis@hcprelog.com"
+
+    if not gmail_app_password:
+        print(f"[Alert] GMAIL_APP_PASSWORD not set — email skipped")
+        print(f"[Alert] Would have sent: {subject}")
+        return
+
+    msg = MIMEText(body, "plain")
+    msg["Subject"] = subject
+    msg["From"]    = sender
+    msg["To"]      = recipient
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=15) as srv:
+            srv.login(sender, gmail_app_password)
+            srv.send_message(msg)
+        print(f"[Alert] ✓ Email sent to {recipient}: {subject}")
+    except Exception as e:
+        print(f"[Alert] Email failed: {e}")
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # STEP 4A — WAN 2.2 S2V (primary: full-body movement + lip sync)
 # Portrait image + audio → natural body/hand/arm movement + lip sync
 # Official model — uses /v1/models/{owner}/{name}/predictions (no version hash)
@@ -507,6 +546,18 @@ def create_sadtalker_prediction(avatar_url, audio_url, version):
             pred_id = resp["id"]
             print(f"[Replicate] Prediction created: {pred_id} ✓")
             return pred_id
+        if status == 402:
+            print(f"[Replicate] Insufficient credit (402) — Replicate balance is zero")
+            send_email_alert(
+                "⚠️ H&C Reels: Replicate balance empty — Reel NOT posted",
+                "Your Replicate account has run out of credit.\n"
+                "The weekly Reel pipeline has paused.\n\n"
+                "Add credits here:\nhttps://replicate.com/account/billing\n\n"
+                "Once credits are added, the pipeline resumes automatically\n"
+                "next Wednesday at 10AM ET.\n\n"
+                "H&C PRECISE LOGISTICS LLC — Reels Automation"
+            )
+            return None
         if status == 429:
             retry_after = int(resp.get("retry_after", 15))
             wait = retry_after + 5   # buffer over retry_after
@@ -515,7 +566,15 @@ def create_sadtalker_prediction(avatar_url, audio_url, version):
             continue
         print(f"[Replicate] Submission failed {status}: {resp}")
         return None
-    print("[Replicate] Submission failed after 3 attempts (429 rate limit persistent)")
+    print("[Replicate] Submission failed after 3 attempts (429 persistent rate limit)")
+    send_email_alert(
+        "⚠️ H&C Reels: Replicate rate throttled — Reel NOT posted",
+        "Replicate is severely rate-limiting requests — this usually means\n"
+        "the account balance has dropped below $5.00.\n\n"
+        "Check your balance and add credits:\nhttps://replicate.com/account/billing\n\n"
+        "The pipeline will retry automatically next Wednesday at 10AM ET.\n\n"
+        "H&C PRECISE LOGISTICS LLC — Reels Automation"
+    )
     return None
 
 def poll_sadtalker(pred_id, max_wait=1200):

@@ -34,4 +34,5 @@ jobs:
           OPENAI_API_KEY:         ${{ secrets.OPENAI_API_KEY }}
           GITHUB_TOKEN:           ${{ secrets.GH_PAT }}
           GITHUB_REPOSITORY:      ${{ github.repository }}
+          GMAIL_APP_PASSWORD:     ${{ secrets.GMAIL_APP_PASSWORD }}
         run: python automation/create_reel.py
