@@ -14,9 +14,10 @@
     "invoice-documentation",
     "fiscal-year",
     "ebook-plug",
-    "duns-uei"
+    "duns-uei",
+    "win-rate"
   ],
-  "last_posted": "2026-06-24T15:35:08.498749+00:00",
+  "last_posted": "2026-06-25T15:41:24.951664+00:00",
   "note": "Auto-managed by post_instagram.py \u2014 do not edit manually",
   "used_images": [
     "https://images.unsplash.com/photo-1556761175-4b46a572b786?w=1080&q=85",
