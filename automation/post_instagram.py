@@ -34,7 +34,7 @@ TOPICS_FILE    = "automation/topics.json"
 USED_FILE      = "automation/used_topics.json"
 TOPIC_MEMORY   = 15   # avoid repeating any of last N topics
 IMAGE_MEMORY   = 10   # avoid repeating any of last N Unsplash images
-AVATAR_RATE    = 0.25 # 25% of posts use a brand avatar
+AVATAR_RATE    = 0.0 # 25% of posts use a brand avatar
 
 # Permanent brand avatar images — upload once to repo via GitHub web UI
 # Path: avatars/marcus-hale.jpg and avatars/arielle-grant.jpg
