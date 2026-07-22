@@ -33,12 +33,12 @@
     "contract-types",
     "payment-terms",
     "strategy-session-plug",
-    "compliance-matrix"
+    "compliance-matrix",
+    "contract-performance"
   ],
-  "last_posted": "2026-07-21T15:06:29.263752+00:00",
+  "last_posted": "2026-07-22T15:07:03.030641+00:00",
   "note": "Auto-managed by post_instagram.py \u2014 do not edit manually",
   "used_images": [
-    "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=1080&q=85",
     "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=1080&q=85",
     "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?w=1080&q=85",
     "https://images.unsplash.com/photo-1664575602554-2087b04935a5?w=1080&q=85",
@@ -57,6 +57,7 @@
     "https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=1080&q=85",
     "https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1080&q=85",
     "https://images.unsplash.com/photo-1431540015161-0bf868a2d407?w=1080&q=85",
-    "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=1080&q=85"
+    "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=1080&q=85",
+    "https://images.unsplash.com/photo-1572021335469-31706a17aaef?w=1080&q=85"
   ]
 }
