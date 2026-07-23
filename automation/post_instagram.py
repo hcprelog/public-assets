@@ -359,7 +359,7 @@ def generate_caption(topic):
         f"Website: hcprelog.com. Contact: hcprelog@gmail.com. "
         f"RULES: Always use 'H&C PRECISE LOGISTICS LLC' — exact caps. "
         f"Never use old phone (555) or old domain hcpreciselogistics.com. "
-        f"End every post with: hcprelog.com"
+        f"End every post with: 🔗 Link in bio"
     )
     user = (
         f"Write an Instagram caption for this topic: '{topic['title']}'\n"
@@ -399,7 +399,7 @@ def fallback_caption(topic):
         f"H&C PRECISE LOGISTICS LLC helps businesses navigate government contracting — "
         f"from SAM.gov registration to contract execution.\n\n"
         f"SDVOSB + HubZone certified. Durham, NC.\n\n"
-        f"Learn more: hcprelog.com\n\n"
+        f"Learn more — link in bio 🔗"
         f"#GovCon #FederalContracting #SDVOSB #HubZone #SmallBusiness #VeteranOwned "
         f"#GovernmentContracting #HCPreciseLogistics #DurhamNC"
     )
