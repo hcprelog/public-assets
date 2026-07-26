@@ -162,12 +162,14 @@ def mark_topic_used(topic, image_url, image_source, used_data, used_sha):
 
 def gen_image_dalle3(topic):
     """
-    DALL-E 3 via OpenAI API.
+    GPT Image 1 via OpenAI API (dall-e-3 was retired by OpenAI on 2026-05-12).
     Requires API billing at platform.openai.com/account/billing
-    (separate from ChatGPT Plus subscription — ~$0.04/image)
+    (separate from ChatGPT Plus subscription — ~$0.04-0.19/image depending on quality)
+    gpt-image-1 only returns base64 image data (no url option), so the decoded
+    bytes are re-hosted on GitHub Pages via upload_image_to_pages() for Instagram.
     """
     if not OPENAI_API_KEY:
-        print("[Image] DALL-E 3: no API key, skipping")
+        print("[Image] GPT Image 1: no API key, skipping")
         return None
 
     prompt = (
@@ -177,15 +179,20 @@ def gen_image_dalle3(topic):
         f"No text in the image. High quality business photography style. "
         f"1:1 square format."
     )
-    print(f"[Image] Trying DALL-E 3...")
+    print(f"[Image] Trying GPT Image 1...")
     headers = {"Authorization": f"Bearer {OPENAI_API_KEY}"}
-    body = {"model": "dall-e-3", "prompt": prompt, "n": 1, "size": "1024x1024", "quality": "standard"}
+    body = {"model": "gpt-image-1", "prompt": prompt, "n": 1, "size": "1024x1024", "quality": "medium"}
     status, resp = http("POST", "https://api.openai.com/v1/images/generations", headers=headers, data=body, timeout=60)
 
     if status == 200:
-        url = resp["data"][0]["url"]
-        print(f"[Image] DALL-E 3 success ✓")
-        return url
+        b64 = resp["data"][0]["b64_json"]
+        img_bytes = base64.b64decode(b64)
+        img_url = upload_image_to_pages(img_bytes, topic["id"])
+        if img_url:
+            print(f"[Image] GPT Image 1 success ✓ → {img_url}")
+            return img_url
+        print(f"[Image] GPT Image 1: generated but GitHub Pages upload failed")
+        return None
 
     # Diagnose the specific error
     err = resp.get("error", {})
@@ -193,13 +200,13 @@ def gen_image_dalle3(topic):
     msg  = err.get("message", str(resp))
 
     if status == 429 or "billing" in msg.lower() or "quota" in msg.lower() or code == "insufficient_quota":
-        print(f"[Image] DALL-E 3: API billing not active on platform.openai.com")
+        print(f"[Image] GPT Image 1: API billing not active on platform.openai.com")
         print(f"[Image]   Fix: platform.openai.com/account/billing → Add $5 credit")
         print(f"[Image]   Note: ChatGPT Plus does NOT include API access — these are separate billing accounts")
     elif status == 401:
-        print(f"[Image] DALL-E 3: invalid API key — rotate at platform.openai.com/api-keys")
+        print(f"[Image] GPT Image 1: invalid API key — rotate at platform.openai.com/api-keys")
     else:
-        print(f"[Image] DALL-E 3 error {status}: {msg}")
+        print(f"[Image] GPT Image 1 error {status}: {msg}")
 
     return None
 
