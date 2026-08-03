@@ -42,3 +42,12 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: python automation/post_instagram.py
+
+      - name: Send failure alert email
+        if: failure()
+        env:
+          GMAIL_USER: ${{ secrets.GMAIL_USER }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          WORKFLOW_NAME: ${{ github.workflow }}
+        run: python automation/send_failure_alert.py
