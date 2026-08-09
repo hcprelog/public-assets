@@ -530,10 +530,10 @@ def fallback_caption(topic):
 # PUBLISHING
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def wait_for_image_url(image_url, attempts=10, delay=10):
+def wait_for_image_url(image_url, attempts=40, delay=15):
     """
     GitHub Pages must finish rebuilding before Instagram can fetch the URL.
-    Pages deploys have been taking 45-60s. Poll instead of assuming.
+    Pages deploys have been taking 45-60s normally, but spiked to 2m43s-7m59s on 2026-08-06/07 (see pages-build-deployment run history). Budget widened 2026-08-08 to attempts=40 x delay=15s (~10 min) to cover that worst case with margin. Poll instead of assuming.
     """
     if "hcprelog.github.io" not in image_url:
         return True  # Unsplash and other hosts are already live
