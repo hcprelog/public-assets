@@ -1,6 +1,5 @@
 {
   "used": [
-    "contract-performance",
     "capability-statement",
     "start-govcon-commercial",
     "payment-terms",
@@ -49,9 +48,10 @@
     "logistics-federal",
     "govcon-cash-flow",
     "invoice-documentation",
-    "prime-sub-relationships"
+    "prime-sub-relationships",
+    "duns-uei"
   ],
-  "last_posted": "2026-08-20T13:55:14.339207+00:00",
+  "last_posted": "2026-08-21T13:50:31.330915+00:00",
   "note": "Auto-managed by post_instagram.py \u2014 do not edit manually",
   "used_images": [
     "https://images.unsplash.com/photo-1664575602554-2087b04935a5?w=1080&q=85",
