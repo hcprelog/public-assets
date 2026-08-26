@@ -1,6 +1,5 @@
 {
   "used": [
-    "payment-terms",
     "contract-modifications",
     "hc-what-we-do",
     "small-biz-loses",
@@ -49,9 +48,10 @@
     "prime-sub-relationships",
     "duns-uei",
     "strategy-session-plug",
-    "govcon-pricing"
+    "govcon-pricing",
+    "delivery-schedule"
   ],
-  "last_posted": "2026-08-25T13:54:48.455187+00:00",
+  "last_posted": "2026-08-26T13:59:06.198441+00:00",
   "note": "Auto-managed by post_instagram.py \u2014 do not edit manually",
   "used_images": [
     "https://images.unsplash.com/photo-1664575602554-2087b04935a5?w=1080&q=85",
