@@ -1,6 +1,5 @@
 {
   "used": [
-    "hc-what-we-do",
     "small-biz-loses",
     "osha-safety",
     "performance-work-statement",
@@ -49,9 +48,10 @@
     "strategy-session-plug",
     "govcon-pricing",
     "delivery-schedule",
-    "compliance-matrix"
+    "compliance-matrix",
+    "sources-sought"
   ],
-  "last_posted": "2026-08-27T22:54:16.784941+00:00",
+  "last_posted": "2026-08-28T22:58:44.717774+00:00",
   "note": "Auto-managed by post_instagram.py \u2014 do not edit manually",
   "used_images": [
     "https://images.unsplash.com/photo-1664575602554-2087b04935a5?w=1080&q=85",
