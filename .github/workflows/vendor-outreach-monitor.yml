@@ -1,0 +1,105 @@
+name: Vendor Outreach & Reply Monitor
+
+# ── Triggers ────────────────────────────────────────────────────────────────────
+on:
+  schedule:
+    # Outreach check: weekdays at 9 AM ET (1 PM UTC)
+    - cron: '0 13 * * 1-5'
+    # Reply monitor: weekdays at 5 PM ET (9 PM UTC) — end of business sweep
+    - cron: '0 21 * * 1-5'
+
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Run mode'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - outreach       # send to COLD/DRAFTED candidates only
+          - monitor        # check Gmail for replies only
+          - both           # outreach then monitor
+      dry_run:
+        description: 'Dry run — preview only, no emails sent'
+        required: false
+        default: 'false'
+        type: boolean
+
+# ── Job ──────────────────────────────────────────────────────────────────────────
+jobs:
+  vendor-automation:
+    name: Vendor Outreach / Reply Monitor
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # to commit vendor file updates back to repo
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── 2. Python ──────────────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install requests
+
+      # ── 3. Determine mode ──────────────────────────────────────────────────────
+      - name: Resolve run mode
+        id: mode
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            HOUR=$(date -u +%H)
+            # 13 UTC = 9 AM ET → outreach; 21 UTC = 5 PM ET → monitor
+            if [ "$HOUR" = "13" ]; then
+              echo "mode=outreach" >> "$GITHUB_OUTPUT"
+            else
+              echo "mode=monitor" >> "$GITHUB_OUTPUT"
+            fi
+          else
+            echo "mode=${{ github.event.inputs.mode || 'both' }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      # ── 4. Run outreach (send emails to COLD/DRAFTED candidates) ───────────────
+      - name: Run vendor outreach
+        if: steps.mode.outputs.mode == 'outreach' || steps.mode.outputs.mode == 'both'
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+        run: |
+          cd automation/scripts
+          FLAGS=""
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            FLAGS="--dry-run"
+          fi
+          python vendor_outreach_engine.py outreach $FLAGS
+
+      # ── 5. Run reply monitor (check Gmail for responses, update tracker) ────────
+      - name: Run reply monitor
+        if: steps.mode.outputs.mode == 'monitor' || steps.mode.outputs.mode == 'both'
+        env:
+          GMAIL_CLIENT_ID: ${{ secrets.GMAIL_CLIENT_ID }}
+          GMAIL_CLIENT_SECRET: ${{ secrets.GMAIL_CLIENT_SECRET }}
+          GMAIL_REFRESH_TOKEN: ${{ secrets.GMAIL_REFRESH_TOKEN }}
+        run: |
+          cd automation/scripts
+          python vendor_outreach_engine.py monitor
+
+      # ── 6. Commit updated vendor files + log ───────────────────────────────────
+      - name: Commit vendor tracker updates
+        run: |
+          git config user.name "H&C Ops Bot"
+          git config user.email "hcprelog@gmail.com"
+          git add govcon/vendors/ automation/logs/
+          git diff --staged --quiet \
+            && echo "No changes to commit" \
+            || git commit -m "[$(date +%Y-%m-%d)] automation: vendor outreach/reply-monitor run (${{ steps.mode.outputs.mode }})"
+
+      - name: Push changes
+        run: git push origin HEAD
