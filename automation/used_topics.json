@@ -1,6 +1,5 @@
 {
   "used": [
-    "osha-safety",
     "performance-work-statement",
     "hc-free-academy",
     "invoice-documentation",
@@ -49,9 +48,10 @@
     "delivery-schedule",
     "compliance-matrix",
     "sources-sought",
-    "market-research"
+    "market-research",
+    "teaming-agreement"
   ],
-  "last_posted": "2026-08-31T19:28:34.309791+00:00",
+  "last_posted": "2026-09-02T17:05:42.564067+00:00",
   "note": "Auto-managed by post_instagram.py \u2014 do not edit manually",
   "used_images": [
     "https://images.unsplash.com/photo-1664575602554-2087b04935a5?w=1080&q=85",
